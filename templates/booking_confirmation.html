@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <div class="alert alert-success text-center" role="alert">
+    <h4 class="alert-heading">✅ Booking Confirmed!</h4>
+    <p>Your ticket has been successfully booked.</p>
+    <hr>
+    <p class="mb-0">Your PNR Number is: <strong>{{ booking.pnr_number }}</strong></p>
+  </div>
+
+  <div class="card mt-4">
+    <div class="card-header">
+      Booking Details
+    </div>
+    <div class="card-body">
+      <p><strong>Passenger:</strong> {{ booking.passenger_name }} ({{ booking.passenger_age }} years)</p>
+      <p><strong>Train:</strong> {{ booking.train.train_name }}</p>
+      <p><strong>Route:</strong> {{ booking.train.source }} to {{ booking.train.destination }}</p>
+      <p><strong>Departure:</strong> {{ booking.train.departure_time }}</p>
+    </div>
+  </div>
+
+  <a href="/" class="btn btn-secondary mt-3">Book Another Ticket</a>
+{% endblock %}

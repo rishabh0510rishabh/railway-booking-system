@@ -1,19 +1,18 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Search Trains</title>
-</head>
-<body>
-    <h1>Search for Trains</h1>
+{% extends 'base.html' %}
+
+{% block content %}
+  <div class="card bg-light p-4">
+    <h1 class="display-6 mb-4">Search for Trains</h1>
     <form action="/search" method="post">
-        <label for="source">From:</label>
-        <input type="text" id="source" name="source" required>
-        <br><br>
-        <label for="destination">To:</label>
-        <input type="text" id="destination" name="destination" required>
-        <br><br>
-        <button type="submit">Search</button>
+      <div class="mb-3">
+        <label for="source" class="form-label">From:</label>
+        <input type="text" class="form-control" id="source" name="source" placeholder="e.g., New Delhi" required>
+      </div>
+      <div class="mb-3">
+        <label for="destination" class="form-label">To:</label>
+        <input type="text" class="form-control" id="destination" name="destination" placeholder="e.g., Lucknow" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Search</button>
     </form>
-</body>
-</html>
+  </div>
+{% endblock %}
