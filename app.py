@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, render_template, request
 from flask_sqlalchemy import SQLAlchemy
 
 # Initialize the Flask app
@@ -33,8 +33,18 @@ class Booking(db.Model):
 
 @app.route('/')
 def index():
-    return "Your Railway Booking System is running!"
+    return render_template('index.html')
 
+@app.route('/search', methods=['POST'])
+def search():
+    source = request.form['source']
+    destination = request.form['destination']
+
+    # Query the database for matching trains
+    trains = Train.query.filter_by(source=source, destination=destination).all()
+
+    # We will create results.html in the next step
+    return render_template('results.html', trains=trains, source=source, destination=destination)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Search Results</title>
+</head>
+<body>
+    <h1>Showing trains from {{ source }} to {{ destination }}</h1>
+
+    {% if trains %}
+        {% for train in trains %}
+            <div>
+                <p><strong>Train Name:</strong> {{ train.train_name }}</p>
+                <p><strong>Departs at:</strong> {{ train.departure_time }}</p>
+                <p><strong>Total Seats:</strong> {{ train.total_seats }}</p>
+            </div>
+            <hr>
+        {% endfor %}
+    {% else %}
+        <p>No trains found for this route.</p>
+    {% endif %}
+
+    <a href="/">Search Again</a>
+</body>
+</html>
