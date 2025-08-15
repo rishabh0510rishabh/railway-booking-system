@@ -221,11 +221,16 @@ def login():
 
 @app.route('/admin/dashboard')
 def admin_dashboard():
-    # Protect this route
     if not session.get('is_admin'):
+        flash('You must be an admin to access this page.', 'danger')
         return redirect(url_for('login'))
+    
+    # Fetch all data needed for the dashboard
+    all_bookings = Booking.query.order_by(Booking.id.desc()).all()
+    all_trains = Train.query.order_by(Train.train_name).all()
+    
+    return render_template('admin_dashboard.html', bookings=all_bookings, trains=all_trains)
 
-    return render_template('admin_dashboard.html')
 
 @app.route('/logout')
 def logout():
@@ -243,6 +248,31 @@ def my_bookings():
     # Find all bookings linked to the current user's ID
     bookings = Booking.query.filter_by(user_id=user_id).order_by(Booking.id.desc()).all()
     return render_template('my_bookings.html', bookings=bookings)
+
+# this new route will handle adding a train
+@app.route('/admin/add_train', methods=['POST'])
+def add_train():
+    if not session.get('is_admin'):
+        return redirect(url_for('login'))
+
+    train_name = request.form['train_name']
+    source = request.form['source']
+    destination = request.form['destination']
+    departure_time = request.form['departure_time']
+    total_seats = request.form['total_seats']
+
+    new_train = Train(
+        train_name=train_name,
+        source=source,
+        destination=destination,
+        departure_time=departure_time,
+        total_seats=total_seats
+    )
+    db.session.add(new_train)
+    db.session.commit()
+
+    flash(f'Train "{train_name}" has been added successfully!', 'success')
+    return redirect(url_for('admin_dashboard'))
 
 if __name__ == '__main__':
     with app.app_context():

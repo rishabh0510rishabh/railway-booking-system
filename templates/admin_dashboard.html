@@ -1,7 +1,120 @@
 {% extends 'base.html' %}
 
 {% block content %}
-  <h1 class="display-6">Admin Dashboard</h1>
-  <p>Welcome, Admin! From here you can manage trains and view all bookings.</p>
-  <!-- Admin features will be added here later -->
+<h1 class="display-6 mb-4">Admin Dashboard</h1>
+
+<div class="row">
+  <!-- Left Column: Add New Train Form -->
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header">Add New Train</div>
+      <div class="card-body">
+        <form action="{{ url_for('add_train') }}" method="post">
+          <!-- Form fields for adding a train -->
+          <div class="mb-3"><label for="train_name" class="form-label">Train Name</label><input type="text" class="form-control" id="train_name" name="train_name" required></div>
+          <div class="mb-3"><label for="source" class="form-label">Source</label><input type="text" class="form-control" id="source" name="source" required></div>
+          <div class="mb-3"><label for="destination" class="form-label">Destination</label><input type="text" class="form-control" id="destination" name="destination" required></div>
+          <div class="mb-3"><label for="departure_time" class="form-label">Departure Time</label><input type="time" class="form-control" id="departure_time" name="departure_time" required></div>
+          <div class="mb-3"><label for="total_seats" class="form-label">Total Seats</label><input type="number" class="form-control" id="total_seats" name="total_seats" min="0" required></div>
+          <button type="submit" class="btn btn-primary">Add Train</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Tabs for Bookings and Trains -->
+  <div class="col-md-8">
+    <!-- Nav tabs -->
+    <ul class="nav nav-tabs" id="adminTab" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="bookings-tab" data-bs-toggle="tab" data-bs-target="#bookings" type="button" role="tab">All Bookings</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="trains-tab" data-bs-toggle="tab" data-bs-target="#trains" type="button" role="tab">All Trains</button>
+      </li>
+    </ul>
+
+    <!-- Tab panes -->
+    <div class="tab-content" id="adminTabContent">
+      <!-- Bookings Tab -->
+      <div class="tab-pane fade show active" id="bookings" role="tabpanel">
+        <div class="card">
+          <div class="card-body">
+            <input type="text" id="bookingSearch" class="form-control mb-3" placeholder="Type to search bookings...">
+            <div class="table-responsive">
+              <table class="table table-striped table-hover">
+                <thead>
+                  <tr>
+                    <th>PNR</th>
+                    <th>Passenger</th>
+                    <th>Train</th>
+                    <th>Booked By</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="bookingsTable">
+                  {% for booking in bookings %}
+                  <tr>
+                    <td>{{ booking.pnr_number }}</td>
+                    <td>{{ booking.passenger_name }}</td>
+                    <td>{{ booking.train.train_name }}</td>
+                    <td>{{ booking.user.username }}</td>
+                    <td>
+                      <a href="{{ url_for('download_ticket', pnr=booking.pnr_number) }}" class="btn btn-sm btn-outline-success">PDF</a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trains Tab -->
+      <div class="tab-pane fade" id="trains" role="tabpanel">
+        <div class="card">
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-striped">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Train Name</th>
+                    <th>Route</th>
+                    <th>Departure</th>
+                    <th>Total Seats</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for train in trains %}
+                  <tr>
+                    <td>{{ train.id }}</td>
+                    <td>{{ train.train_name }}</td>
+                    <td>{{ train.source }} to {{ train.destination }}</td>
+                    <td>{{ train.departure_time }}</td>
+                    <td>{{ train.total_seats }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- JavaScript for the live search -->
+<script>
+  document.getElementById('bookingSearch').addEventListener('keyup', function() {
+    let filter = this.value.toUpperCase();
+    let tableBody = document.getElementById('bookingsTable');
+    let rows = tableBody.getElementsByTagName('tr');
+    for (let row of rows) {
+      row.style.display = row.textContent.toUpperCase().includes(filter) ? "" : "none";
+    }
+  });
+</script>
 {% endblock %}
