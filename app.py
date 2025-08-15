@@ -1,9 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, flash, make_response, send_file
 import time
 import random
 import string
-from flask import flash 
 from flask_sqlalchemy import SQLAlchemy
+from fpdf import FPDF
 
 # Initialize the Flask app
 app = Flask(__name__)
@@ -101,6 +101,48 @@ def booking_confirmation(pnr):
     # Find the booking in the database using the PNR
     booking_details = Booking.query.filter_by(pnr_number=pnr).first_or_404()
     return render_template('booking_confirmation.html', booking=booking_details)
+
+@app.route('/pnr_status')
+def pnr_status():
+    pnr = request.args.get('pnr')
+    if not pnr:
+        flash('Please enter a PNR number.', 'warning')
+        return redirect(url_for('index'))
+
+    booking = Booking.query.filter_by(pnr_number=pnr.strip()).first()
+
+    if booking:
+        return render_template('ticket_details.html', booking=booking)
+    else:
+        flash('Invalid PNR Number. Please check and try again.', 'danger')
+        return redirect(url_for('index'))
+
+@app.route('/download_ticket/<pnr>')
+def download_ticket(pnr):
+    booking = Booking.query.filter_by(pnr_number=pnr).first_or_404()
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, "E-Ticket", 1, 1, 'C')
+
+    pdf.set_font("Helvetica", "", 12)
+    pdf.cell(0, 10, f"PNR Number: {booking.pnr_number}", 0, 1)
+    pdf.cell(0, 10, f"Passenger: {booking.passenger_name}, Age: {booking.passenger_age}", 0, 1)
+    pdf.cell(0, 10, f"Train: {booking.train.train_name}", 0, 1)
+    pdf.cell(0, 10, f"Route: {booking.train.source} to {booking.train.destination}", 0, 1)
+    pdf.cell(0, 10, f"Departure Time: {booking.train.departure_time}", 0, 1)
+    pdf.cell(0, 10, f"Status: {booking.status}", 0, 1)
+
+    # Define the filename for the temporary PDF
+    pdf_filename = f"ticket_{pnr}.pdf"
+
+    # Save the PDF to a file on the server
+    pdf.output(pdf_filename)
+
+    # Send the file to the user for download
+    return send_file(pdf_filename, as_attachment=True)
+
 
 if __name__ == '__main__':
     with app.app_context():

@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h4>Ticket Details</h4>
+      <a href="{{ url_for('download_ticket', pnr=booking.pnr_number) }}" class="btn btn-success">Download PDF</a>
+    </div>
+    <div class="card-body">
+      <p><strong>PNR Number:</strong> {{ booking.pnr_number }}</p>
+      <p><strong>Status:</strong> <span class="badge bg-primary">{{ booking.status }}</span></p>
+      <hr>
+      <p><strong>Passenger:</strong> {{ booking.passenger_name }} ({{ booking.passenger_age }} years)</p>
+      <p><strong>Train:</strong> {{ booking.train.train_name }}</p>
+      <p><strong>Route:</strong> {{ booking.train.source }} to {{ booking.train.destination }}</p>
+      <p><strong>Departure:</strong> {{ booking.train.departure_time }}</p>
+    </div>
+  </div>
+{% endblock %}
