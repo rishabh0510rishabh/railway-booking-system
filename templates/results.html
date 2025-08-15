@@ -19,10 +19,12 @@
             <td>{{ train.train_name }}</td>
             <td>{{ train.departure_time }}</td>
             <td>
-              {% if train.available_seats > 0 %}
-                <span class="badge bg-success">{{ train.available_seats }}</span>
+              {% if train.available_seats > 20 %}
+                <span class="badge bg-success">Available: {{ train.available_seats }}</span>
+              {% elif train.available_seats > 0 %}
+                <span class="badge bg-warning text-dark">Filling Fast: {{ train.available_seats }}</span>
               {% else %}
-                <span class="badge bg-danger">WAITLISTED</span>
+                <span class="badge bg-danger">Waitlisted</span>
               {% endif %}
             </td>
             <td>

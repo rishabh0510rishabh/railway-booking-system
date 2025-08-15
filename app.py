@@ -31,8 +31,8 @@ class Booking(db.Model):
     train_id = db.Column(db.Integer, db.ForeignKey('train.id'), nullable=False)
     passenger_name = db.Column(db.String(100), nullable=False)
     passenger_age = db.Column(db.Integer, nullable=False)
+    seat_class = db.Column(db.String(50), nullable=False, default='Sleeper')
     status = db.Column(db.String(20), default='Confirmed')
-    
     train = db.relationship('Train', backref=db.backref('bookings', lazy=True))
 
 
@@ -44,14 +44,23 @@ def index():
 def search():
     source = request.form['source']
     destination = request.form['destination']
+    time_filter = request.form['time_filter']
 
-    trains = Train.query.filter_by(source=source, destination=destination).all()
+    # Start with the basic query
+    query = Train.query.filter_by(source=source, destination=destination)
+
+    # Apply time filter if not 'all'
+    if time_filter == 'morning':
+        query = query.filter(Train.departure_time >= '05:00', Train.departure_time < '12:00')
+    elif time_filter == 'afternoon':
+        query = query.filter(Train.departure_time >= '12:00', Train.departure_time < '17:00')
+    elif time_filter == 'evening':
+        query = query.filter(Train.departure_time >= '17:00', Train.departure_time < '24:00')
     
-    # New logic starts here
+    trains = query.all()
+    
     for train in trains:
-        # Count how many bookings exist for this train
         confirmed_bookings = Booking.query.filter_by(train_id=train.id).count()
-        # Calculate available seats
         train.available_seats = train.total_seats - confirmed_bookings
         
     return render_template('results.html', trains=trains, source=source, destination=destination)
@@ -77,22 +86,24 @@ def book(train_id):
     return render_template('booking_form.html', train=train_to_book)
 
 @app.route('/submit_booking', methods=['POST'])
+@app.route('/submit_booking', methods=['POST'])
 def submit_booking():
     train_id = request.form['train_id']
     passenger_name = request.form['passenger_name']
     passenger_age = request.form['passenger_age']
+    seat_class = request.form['seat_class'] # Get seat class from form
 
     new_booking = Booking(
         pnr_number=generate_pnr(),
         train_id=train_id,
         passenger_name=passenger_name,
-        passenger_age=passenger_age
+        passenger_age=passenger_age,
+        seat_class=seat_class # Save it to the database
     )
     
     db.session.add(new_booking)
     db.session.commit()
     
-    # Redirect to the new confirmation page, passing the new PNR
     return redirect(url_for('booking_confirmation', pnr=new_booking.pnr_number))
 
 # Add this new route to show the confirmation page

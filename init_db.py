@@ -1,6 +1,11 @@
-from app import app, db, Train
+import os
+from app import app, db, Train, Booking, generate_pnr
 
-# A list of 25 train entries
+# --- Configuration ---
+DB_FILE = 'railway.db'
+
+# --- Train Data ---
+# This list remains the same
 train_data = [
     {'name': 'Shatabdi Express', 'source': 'New Delhi', 'dest': 'Lucknow', 'time': '06:15', 'seats': 150},
     {'name': 'Rajdhani Express', 'source': 'Mumbai', 'dest': 'New Delhi', 'time': '17:00', 'seats': 200},
@@ -29,10 +34,18 @@ train_data = [
     {'name': 'Lucknow Mail', 'source': 'New Delhi', 'dest': 'Lucknow', 'time': '22:05', 'seats': 270}
 ]
 
+# --- Main Execution ---
 with app.app_context():
-    # Optional: Delete all existing trains to start fresh
-    Train.query.delete()
+    # Check if the database file exists and delete it for a clean start
+    if os.path.exists(DB_FILE):
+        os.remove(DB_FILE)
+        print("Old database removed.")
 
+    # Create tables
+    db.create_all()
+    print("Database tables created.")
+
+    # Add trains
     for train_info in train_data:
         train = Train(
             train_name=train_info['name'],
@@ -42,6 +55,34 @@ with app.app_context():
             total_seats=train_info['seats']
         )
         db.session.add(train)
+    db.session.commit()
+    print(f"Added {len(train_data)} trains.")
+
+    # --- Add Realistic Bookings ---
+    print("Adding realistic bookings...")
+
+    # 1. Add some varied, individual bookings
+    initial_bookings = [
+        (1, 'Amit Kumar', 34, 'Sleeper'), (1, 'Priya Sharma', 28, 'AC 2 Tier'),
+        (2, 'Rajesh Singh', 45, 'AC 1st Class'), (3, 'Sunita Devi', 52, 'Sleeper'),
+        (8, 'Deepak Gupta', 41, 'Sleeper'), (10, 'Neha Reddy', 25, 'AC 2 Tier'),
+        (15, 'Suresh Patil', 60, 'Sleeper'), (20, 'Manoj Tiwari', 38, 'Sleeper'),
+    ]
+    for train_id, name, age, s_class in initial_bookings:
+        db.session.add(Booking(pnr_number=generate_pnr(), train_id=train_id, passenger_name=name, passenger_age=age, seat_class=s_class))
+    
+    # 2. Make Gatimaan Express (ID 5, 100 seats) COMPLETELY FULL
+    for i in range(100):
+        db.session.add(Booking(pnr_number=generate_pnr(), train_id=5, passenger_name=f'Passenger G{i+1}', passenger_age=30, seat_class='Sleeper'))
+
+    # 3. Make Deccan Queen (ID 9, 160 seats) NEARLY FULL (5 seats left)
+    for i in range(155):
+        db.session.add(Booking(pnr_number=generate_pnr(), train_id=9, passenger_name=f'Passenger D{i+1}', passenger_age=35, seat_class='AC 3 Tier'))
+        
+    # 4. Make Tejas Express (ID 4, 120 seats) NEARLY FULL (4 seats left)
+    for i in range(116):
+        db.session.add(Booking(pnr_number=generate_pnr(), train_id=4, passenger_name=f'Passenger T{i+1}', passenger_age=40, seat_class='AC 2 Tier'))
 
     db.session.commit()
-    print(f"Successfully added {len(train_data)} trains to the database.")
+    print("Realistic bookings added successfully.")
+    print("\n✅ Database has been successfully initialized and populated!")

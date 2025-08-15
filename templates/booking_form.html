@@ -6,12 +6,22 @@
     <h5 class="mb-4 text-muted">Train: {{ train.train_name }} ({{ train.source }} to {{ train.destination }})</h5>
     
     <form action="{{ url_for('submit_booking') }}" method="post">
-      <!-- Hidden input to pass the train_id -->
       <input type="hidden" name="train_id" value="{{ train.id }}">
       
       <div class="mb-3">
         <label for="passenger_name" class="form-label">Passenger Name:</label>
         <input type="text" class="form-control" id="passenger_name" name="passenger_name" required>
+      </div>
+
+      <!-- Add this Seat Class Dropdown -->
+      <div class="mb-3">
+        <label for="seat_class" class="form-label">Seat Class:</label>
+        <select class="form-select" id="seat_class" name="seat_class">
+          <option>Sleeper</option>
+          <option>AC 3 Tier</option>
+          <option>AC 2 Tier</option>
+          <option>AC 1st Class</option>
+        </select>
       </div>
       
       <div class="mb-3">
