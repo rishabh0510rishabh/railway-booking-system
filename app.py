@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, make_response, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, make_response, send_file, session
 import time
 import random
 import string
@@ -154,6 +154,31 @@ def download_ticket(pnr):
     # Send the file to the user for download
     return send_file(pdf_filename, as_attachment=True)
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        # Hardcoded credentials for simplicity
+        if request.form['username'] == 'admin' and request.form['password'] == 'password123':
+            session['is_admin'] = True
+            flash('Login successful!', 'success')
+            return redirect(url_for('admin_dashboard'))
+        else:
+            flash('Invalid credentials. Please try again.', 'danger')
+    return render_template('admin_login.html')
+
+@app.route('/admin/dashboard')
+def admin_dashboard():
+    # Protect this route
+    if not session.get('is_admin'):
+        return redirect(url_for('login'))
+
+    return render_template('admin_dashboard.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('is_admin', None) # Remove the admin flag from the session
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
     with app.app_context():
