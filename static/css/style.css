@@ -1,0 +1,51 @@
+/* static/css/style.css */
+body {
+    background-color: #f8f9fa;
+}
+
+.navbar {
+    box-shadow: 0 2px 4px rgba(0,0,0,.1);
+}
+
+.hero-section {
+    position: relative;
+    /* Replace the old background with this one */
+    background: url('https://c.ndtvimg.com/2025-06/i6a0cf8k_travel_625x300_20_June_25.jpg?im=FeatureCrop,algorithm=dnn,width=773,height=435') no-repeat center center;
+    background-size: cover;
+    color: white;
+    padding: 5rem 0;
+    text-align: center;
+    border-radius: 0.5rem;
+    margin-bottom: 2rem;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+}
+
+/* This is the new dark overlay */
+.hero-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.4); /* Black with 40% opacity */
+    border-radius: 0.5rem; /* Match the parent's border radius */
+}
+
+/* This ensures the text appears above the overlay */
+.hero-section .container {
+    position: relative;
+    z-index: 2;
+}
+
+
+.card {
+    border: none;
+    box-shadow: 0 4px 8px rgba(0,0,0,.1);
+}
+
+/* This new class will constrain the width of our main content */
+.main-container {
+    max-width: 960px;
+    margin: auto;
+}

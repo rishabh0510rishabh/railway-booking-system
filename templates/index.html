@@ -1,21 +1,35 @@
 {% extends 'base.html' %}
 
 {% block content %}
-  <div class="card bg-light p-4">
-    <h1 class="display-6 mb-4">Search for Trains</h1>
-    <form action="/search" method="post">
-      <div class="mb-3">
-        <label for="source" class="form-label">From:</label>
-        <input type="text" class="form-control" id="source" name="source" placeholder="e.g., New Delhi" required>
-      </div>
-      <div class="mb-3">
-        <label for="destination" class="form-label">To:</label>
-        <input type="text" class="form-control" id="destination" name="destination" placeholder="e.g., Lucknow" required>
-      </div>
+  <!-- New Hero Section -->
+  <div class="hero-section">
+    <div class="container">
+      <h1 class="display-4">Your Journey Starts Here</h1>
+      <p class="lead">Find and book train tickets across the country with ease.</p>
+    </div>
+  </div>
 
-      <!-- Add this Time Filter -->
+  <!-- Search Form Card -->
+  <div class="card bg-light p-4 mb-5">
+    <h2 class="mb-4 text-center">Search for Trains</h2>
+    <form action="/search" method="post">
+      <div class="row">
+        <div class="col-md-5 mb-3">
+          <label for="source" class="form-label">From:</label>
+          <input type="text" class="form-control" id="source" name="source" placeholder="e.g., New Delhi" required>
+        </div>
+        <div class="col-md-5 mb-3">
+          <label for="destination" class="form-label">To:</label>
+          <input type="text" class="form-control" id="destination" name="destination" placeholder="e.g., Lucknow" required>
+        </div>
+        <div class="col-md-2 d-grid mb-3">
+            <label class="form-label">&nbsp;</label> <!-- Spacer for alignment -->
+            <button type="submit" class="btn btn-primary">Search</button>
+        </div>
+      </div>
+      <!-- Time Filter remains the same -->
       <div class="mb-3">
-        <label class="form-label">Departure Time:</label>
+        <label class="form-label d-block">Departure Time:</label>
         <div class="form-check form-check-inline">
           <input class="form-check-input" type="radio" name="time_filter" id="time_all" value="all" checked>
           <label class="form-check-label" for="time_all">All</label>
@@ -33,20 +47,6 @@
           <label class="form-check-label" for="time_evening">Evening (5pm-12am)</label>
         </div>
       </div>
-      
-      <button type="submit" class="btn btn-primary">Search</button>
     </form>
-  </div>
-  <div class="row mt-5">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">About Our Service</h5>
-                <p class="card-text">
-                    Welcome to our Railway Booking System, a mini-project designed to replicate the core functionalities of a real-world train ticket booking platform. You can search for trains, view seat availability in real-time, book tickets across different seat classes, and check your booking status using a unique PNR number. This project was built using Python, Flask, and SQLAlchemy.
-                </p>
-            </div>
-        </div>
-    </div>
   </div>
 {% endblock %}
