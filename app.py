@@ -4,6 +4,7 @@ import random
 import string
 from flask_sqlalchemy import SQLAlchemy
 from fpdf import FPDF
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # Initialize the Flask app
 app = Flask(__name__)
@@ -29,12 +30,30 @@ class Booking(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     pnr_number = db.Column(db.String(20), unique=True, nullable=False)
     train_id = db.Column(db.Integer, db.ForeignKey('train.id'), nullable=False)
+
+    # Add this user_id foreign key
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
     passenger_name = db.Column(db.String(100), nullable=False)
     passenger_age = db.Column(db.Integer, nullable=False)
     seat_class = db.Column(db.String(50), nullable=False, default='Sleeper')
     status = db.Column(db.String(20), default='Confirmed')
-    train = db.relationship('Train', backref=db.backref('bookings', lazy=True))
 
+    train = db.relationship('Train', backref=db.backref('bookings', lazy=True))
+    # Add this relationship to the User model
+    user = db.relationship('User', backref=db.backref('bookings', lazy=True))
+
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
+    role = db.Column(db.String(20), nullable=False, default='user') # Roles: 'user' or 'admin'
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
 @app.route('/')
 def index():
@@ -85,28 +104,32 @@ def book(train_id):
 
     return render_template('booking_form.html', train=train_to_book)
 
-@app.route('/submit_booking', methods=['POST'])
+
 @app.route('/submit_booking', methods=['POST'])
 def submit_booking():
+    if not session.get('logged_in'):
+        flash('You must be logged in to book a ticket.', 'danger')
+        return redirect(url_for('login'))
+
     train_id = request.form['train_id']
     passenger_name = request.form['passenger_name']
     passenger_age = request.form['passenger_age']
-    seat_class = request.form['seat_class'] # Get seat class from form
+    seat_class = request.form['seat_class']
 
     new_booking = Booking(
         pnr_number=generate_pnr(),
         train_id=train_id,
+        user_id=session['user_id'], # Link booking to logged-in user
         passenger_name=passenger_name,
         passenger_age=passenger_age,
-        seat_class=seat_class # Save it to the database
+        seat_class=seat_class
     )
     
     db.session.add(new_booking)
     db.session.commit()
     
     return redirect(url_for('booking_confirmation', pnr=new_booking.pnr_number))
-
-# Add this new route to show the confirmation page
+# new route to show the confirmation page
 @app.route('/confirmation/<pnr>')
 def booking_confirmation(pnr):
     # Find the booking in the database using the PNR
@@ -154,17 +177,47 @@ def download_ticket(pnr):
     # Send the file to the user for download
     return send_file(pdf_filename, as_attachment=True)
 
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        user_exists = User.query.filter_by(username=username).first()
+        if user_exists:
+            flash('Username already exists. Please choose a different one.', 'danger')
+            return redirect(url_for('signup'))
+            
+        new_user = User(username=username)
+        new_user.set_password(password)
+        db.session.add(new_user)
+        db.session.commit()
+        
+        flash('Account created successfully! Please log in.', 'success')
+        return redirect(url_for('login'))
+        
+    return render_template('signup.html')
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        # Hardcoded credentials for simplicity
-        if request.form['username'] == 'admin' and request.form['password'] == 'password123':
-            session['is_admin'] = True
+        username = request.form['username']
+        password = request.form['password']
+        user = User.query.filter_by(username=username).first()
+        
+        if user and user.check_password(password):
+            session['logged_in'] = True
+            session['user_id'] = user.id
+            session['username'] = user.username
+            session['is_admin'] = (user.role == 'admin')
+            
             flash('Login successful!', 'success')
-            return redirect(url_for('admin_dashboard'))
+            return redirect(url_for('index'))
         else:
-            flash('Invalid credentials. Please try again.', 'danger')
-    return render_template('admin_login.html')
+            flash('Invalid username or password.', 'danger')
+            
+    return render_template('login.html')
+
 
 @app.route('/admin/dashboard')
 def admin_dashboard():
@@ -176,9 +229,20 @@ def admin_dashboard():
 
 @app.route('/logout')
 def logout():
-    session.pop('is_admin', None) # Remove the admin flag from the session
+    session.clear() # Clear all session data
     flash('You have been logged out.', 'info')
     return redirect(url_for('index'))
+
+@app.route('/my_bookings')
+def my_bookings():
+    if not session.get('logged_in'):
+        flash('You must be logged in to view your bookings.', 'danger')
+        return redirect(url_for('login'))
+
+    user_id = session['user_id']
+    # Find all bookings linked to the current user's ID
+    bookings = Booking.query.filter_by(user_id=user_id).order_by(Booking.id.desc()).all()
+    return render_template('my_bookings.html', bookings=bookings)
 
 if __name__ == '__main__':
     with app.app_context():
