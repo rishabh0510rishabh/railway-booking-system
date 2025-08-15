@@ -10,6 +10,17 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
       <div class="container-fluid">
         <a class="navbar-brand" href="/">🚂 Railway Booking</a>
+        <div class="collapse navbar-collapse">
+           <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+             <li class="nav-item">
+               <a class="nav-link" href="{{ url_for('index') }}">Home</a>
+             </li>
+             <li class="nav-item">
+               <!-- This link will work once we create the admin page -->
+               <a class="nav-link" href="#">Admin Panel</a> 
+             </li>
+           </ul>
+         </div>
         <form class="d-flex" action="{{ url_for('pnr_status') }}" method="get">
           <input class="form-control me-2" type="search" name="pnr" placeholder="Enter PNR to Search" required>
           <button class="btn btn-outline-success" type="submit">Search</button>
