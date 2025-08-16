@@ -177,47 +177,40 @@ def download_ticket(pnr):
     # Send the file to the user for download
     return send_file(pdf_filename, as_attachment=True)
 
-@app.route('/signup', methods=['GET', 'POST'])
+@app.route('/signup', methods=['POST'])
 def signup():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        
-        user_exists = User.query.filter_by(username=username).first()
-        if user_exists:
-            flash('Username already exists. Please choose a different one.', 'danger')
-            return redirect(url_for('signup'))
-            
-        new_user = User(username=username)
-        new_user.set_password(password)
-        db.session.add(new_user)
-        db.session.commit()
-        
-        flash('Account created successfully! Please log in.', 'success')
-        return redirect(url_for('login'))
-        
-    return render_template('signup.html')
+    username = request.form['username']
+    password = request.form['password']
 
-@app.route('/login', methods=['GET', 'POST'])
+    if User.query.filter_by(username=username).first():
+        flash('Username already exists.', 'danger')
+        return redirect(url_for('index'))
+
+    new_user = User(username=username)
+    new_user.set_password(password)
+    db.session.add(new_user)
+    db.session.commit()
+
+    flash('Account created successfully! Please log in.', 'success')
+    return redirect(url_for('index'))
+
+@app.route('/login', methods=['POST'])
+
 def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        user = User.query.filter_by(username=username).first()
-        
-        if user and user.check_password(password):
-            session['logged_in'] = True
-            session['user_id'] = user.id
-            session['username'] = user.username
-            session['is_admin'] = (user.role == 'admin')
-            
-            flash('Login successful!', 'success')
-            return redirect(url_for('index'))
-        else:
-            flash('Invalid username or password.', 'danger')
-            
-    return render_template('login.html')
+    username = request.form['username']
+    password = request.form['password']
+    user = User.query.filter_by(username=username).first()
 
+    if user and user.check_password(password):
+        session['logged_in'] = True
+        session['user_id'] = user.id
+        session['username'] = user.username
+        session['is_admin'] = (user.role == 'admin')
+        flash(f'Welcome back, {user.username}!', 'success')
+    else:
+        flash('Invalid username or password.', 'danger')
+
+    return redirect(url_for('index'))
 
 @app.route('/admin/dashboard')
 def admin_dashboard():
@@ -234,7 +227,7 @@ def admin_dashboard():
 
 @app.route('/logout')
 def logout():
-    session.clear() # Clear all session data
+    session.clear()
     flash('You have been logged out.', 'info')
     return redirect(url_for('index'))
 

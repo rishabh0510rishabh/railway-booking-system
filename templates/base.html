@@ -1,86 +1,114 @@
 <!doctype html>
-<html lang="en" class="h-100">
+<html lang="en" class="h-100" data-bs-theme="light">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Railway Booking System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Link the new CSS file -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth_modal.css') }}">
   </head>
   <body class="d-flex flex-column h-100"> 
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-      <div class="container-fluid">
-        <a class="navbar-brand" href="/">🚂 Railway Booking</a>
+      <div class="container-fluid main-container">
+        <a class="navbar-brand" href="{{ url_for('index') }}">🚂 Railway Booking</a>
         <div class="collapse navbar-collapse" id="navbarNav">
-          <!-- Left side of Navbar -->
           <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-            <li class="nav-item">
-              <a class="nav-link" href="{{ url_for('index') }}">Home</a>
-            </li>
-            {% if session.logged_in %}
-              <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('my_bookings') }}">My Bookings</a>
-              </li>
-            {% endif %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('index') }}">Home</a></li>
           </ul>
-        
-          <!-- Right side of Navbar -->
           <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
             {% if session.logged_in %}
-              <!-- Show Admin Panel link ONLY for admins -->
-              {% if session.is_admin %}
-                <li class="nav-item">
-                  <a class="nav-link" href="{{ url_for('admin_dashboard') }}">Admin Panel</a>
-                </li>
-              {% endif %}
-              <!-- User dropdown for all logged-in users -->
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                  Welcome, {{ session.username }}
-                </a>
+                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Welcome, {{ session.username }}</a>
                 <ul class="dropdown-menu dropdown-menu-end">
                   <li><a class="dropdown-item" href="{{ url_for('logout') }}">Logout</a></li>
                 </ul>
               </li>
             {% else %}
-              <!-- Links for logged-out users -->
               <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('signup') }}">Sign Up</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('login') }}">Login</a>
+                <!-- This button triggers the modal -->
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#authModal">Login / Register</button>
               </li>
             {% endif %}
           </ul>
-        
-          <!-- PNR Search Form (remains on the far right) -->
-          <form class="d-flex ms-3" action="{{ url_for('pnr_status') }}" method="get">
-            <input class="form-control me-2" type="search" name="pnr" placeholder="Enter PNR" required>
-            <button class="btn btn-outline-success" type="submit">Search</button>
-          </form>
         </div>
       </div>
     </nav>
 
-    <!-- Apply the main-container class here -->
     <div class="container mt-4 flex-shrink-0 main-container"> 
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           {% for category, message in messages %}
-            <div class="alert alert-{{ category }}">{{ message }}</div>
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
           {% endfor %}
         {% endif %}
       {% endwith %}
-      {% block content %}
-      {% endblock %}
+      {% block content %}{% endblock %}
     </div>
 
-    <footer class="bg-dark text-white text-center p-4 mt-auto">
-        <div class="container">
-            <p>&copy; 2025 Railway Booking System Clone. All Rights Reserved.</p>
-            <p>Contact us: support@railwayclone.com</p>
+    <!-- AUTH MODAL -->
+    <div class="modal fade" id="authModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-body p-0 auth-container">
+            <div class="auth-card">
+              <!-- Login Form (Front) -->
+              <div class="auth-card-face auth-card-front">
+                <div class="card">
+                  <div class="card-header">
+                    <h5 class="modal-title">Login</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="card-body">
+                    <form action="{{ url_for('login') }}" method="post">
+                      <div class="mb-3"><label class="form-label">Username</label><input type="text" name="username" class="form-control" required></div>
+                      <div class="mb-3"><label class="form-label">Password</label><input type="password" name="password" class="form-control" required></div>
+                      <button type="submit" class="btn btn-primary w-100">Login</button>
+                    </form>
+                    <p class="text-center mt-3">New user? <a href="#" class="flipper">Sign up here</a></p>
+                  </div>
+                </div>
+              </div>
+              <!-- Signup Form (Back) -->
+              <div class="auth-card-face auth-card-back">
+                <div class="card">
+                  <div class="card-header">
+                    <h5 class="modal-title">Sign Up</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="card-body">
+                    <form action="{{ url_for('signup') }}" method="post">
+                      <div class="mb-3"><label class="form-label">Username</label><input type="text" name="username" class="form-control" required></div>
+                      <div class="mb-3"><label class="form-label">Password</label><input type="password" name="password" class="form-control" required></div>
+                      <button type="submit" class="btn btn-primary w-100">Create Account</button>
+                    </form>
+                    <p class="text-center mt-3">Already have an account? <a href="#" class="flipper">Login here</a></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
+    </div>
+    <!-- END AUTH MODAL -->
+
+    <footer class="bg-dark text-white text-center p-4 mt-auto">
+        <div class="container"><p>&copy; 2025 Railway Booking System Clone.</p></div>
     </footer>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      // JavaScript for the flip animation
+      document.querySelectorAll('.flipper').forEach(item => {
+        item.addEventListener('click', event => {
+          event.preventDefault();
+          document.querySelector('.auth-card').classList.toggle('is-flipped');
+        });
+      });
+    </script>
   </body>
 </html>
