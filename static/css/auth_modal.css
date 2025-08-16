@@ -2,6 +2,23 @@
 .auth-container {
     perspective: 1000px;
 }
+.modal {
+    --bs-modal-bg: transparent;
+    --bs-modal-border-color: transparent;
+}
+.modal-dialog {
+    display: flex;
+    align-items: center; /* Vertically center the modal */
+    min-height: calc(100% - 1rem);
+}
+.modal.show .modal-backdrop.show {
+    backdrop-filter: blur(5px);
+    --bs-backdrop-opacity: 0.7;
+}
+
+.auth-container {
+    perspective: 1000px;
+}
 .auth-card {
     width: 100%;
     height: 100%;

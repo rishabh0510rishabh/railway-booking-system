@@ -47,7 +47,9 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
-    role = db.Column(db.String(20), nullable=False, default='user') # Roles: 'user' or 'admin'
+    role = db.Column(db.String(20), nullable=False, default='user')
+    email = db.Column(db.String(120), unique=True, nullable=True)
+    phone_number = db.Column(db.String(20), nullable=True)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -181,26 +183,35 @@ def download_ticket(pnr):
 def signup():
     username = request.form['username']
     password = request.form['password']
+    # --- GET THE NEW FIELDS ---
+    email = request.form.get('email')
+    phone = request.form.get('phone')
 
     if User.query.filter_by(username=username).first():
         flash('Username already exists.', 'danger')
         return redirect(url_for('index'))
-
-    new_user = User(username=username)
+    
+    if email and User.query.filter_by(email=email).first():
+        flash('Email address is already registered.', 'danger')
+        return redirect(url_for('index'))
+        
+    # --- PASS NEW FIELDS TO THE USER OBJECT ---
+    new_user = User(username=username, email=email, phone_number=phone)
     new_user.set_password(password)
     db.session.add(new_user)
     db.session.commit()
-
+    
     flash('Account created successfully! Please log in.', 'success')
     return redirect(url_for('index'))
 
-@app.route('/login', methods=['POST'])
+# In app.py
 
+@app.route('/login', methods=['POST'])
 def login():
     username = request.form['username']
     password = request.form['password']
     user = User.query.filter_by(username=username).first()
-
+    
     if user and user.check_password(password):
         session['logged_in'] = True
         session['user_id'] = user.id
@@ -209,7 +220,7 @@ def login():
         flash(f'Welcome back, {user.username}!', 'success')
     else:
         flash('Invalid username or password.', 'danger')
-
+        
     return redirect(url_for('index'))
 
 @app.route('/admin/dashboard')

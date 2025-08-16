@@ -82,7 +82,9 @@
                   </div>
                   <div class="card-body">
                     <form action="{{ url_for('signup') }}" method="post">
-                      <div class="mb-3"><label class="form-label">Username</label><input type="text" name="username" class="form-control" required></div>
+                      <div class="mb-3"><label class="form-label">Username</label><input type="text" name="username" class="form-control" re
+                      <div class="mb-3"><label class="form-label">Email (Optional)</label><input type="email" name="email" class="form-control"></div>
+                      <div class="mb-3"><label class="form-label">Phone (Optional)</label><input type="tel" name="phone" class="form-control"></div>
                       <div class="mb-3"><label class="form-label">Password</label><input type="password" name="password" class="form-control" required></div>
                       <button type="submit" class="btn btn-primary w-100">Create Account</button>
                     </form>
@@ -101,6 +103,23 @@
         <div class="container"><p>&copy; 2025 Railway Booking System Clone.</p></div>
     </footer>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      // JavaScript to prevent body scroll when modal is open
+      const authModal = document.getElementById('authModal');
+      authModal.addEventListener('shown.bs.modal', () => {
+        document.body.style.overflow = 'hidden';
+      });
+      authModal.addEventListener('hidden.bs.modal', () => {
+        document.body.style.overflow = 'auto';
+      });
+    </script>
+
+    <script>
+      // JavaScript for the flip animation (your existing script)
+      document.querySelectorAll('.flipper').forEach(item => {
+        // ...
+      });
+    </script>
     <script>
       // JavaScript for the flip animation
       document.querySelectorAll('.flipper').forEach(item => {
