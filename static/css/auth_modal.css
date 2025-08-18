@@ -9,7 +9,7 @@
 .modal-dialog {
     display: flex;
     align-items: center; /* Vertically center the modal */
-    min-height: calc(100% - 1rem);
+    min-height: calc(100% - 30rem);
 }
 .modal.show .modal-backdrop.show {
     backdrop-filter: blur(5px);
