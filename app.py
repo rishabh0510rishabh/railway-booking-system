@@ -254,8 +254,8 @@ def my_bookings():
     bookings = Booking.query.filter_by(user_id=user_id).order_by(Booking.id.desc()).all()
     return render_template('my_bookings.html', bookings=bookings)
 
-# This is the new route for the user's profile
-@app.route('/profile')
+#The route for the user's profile
+@app.route('/profile', methods=['GET', 'POST'])
 def profile():
     if not session.get('logged_in'):
         flash('You must be logged in to view your profile.', 'danger')
@@ -263,6 +263,27 @@ def profile():
     
     user_id = session['user_id']
     user = User.query.get_or_404(user_id)
+
+    if request.method == 'POST':
+        new_username = request.form['username']
+        new_email = request.form['email']
+        new_phone = request.form['phone']
+
+        # Check if the new username is already in use by another user
+        if new_username != user.username and User.query.filter_by(username=new_username).first():
+            flash('This username is already taken. Please choose a different one.', 'danger')
+            return redirect(url_for('profile'))
+
+        # Update user information
+        user.username = new_username
+        user.email = new_email
+        user.phone_number = new_phone
+        
+        db.session.commit()
+        session['username'] = user.username # Update the session with the new username
+        flash('Profile updated successfully!', 'success')
+        return redirect(url_for('profile'))
+    
     return render_template('profile.html', user=user)
 
 # this new route will handle adding a train
@@ -289,6 +310,28 @@ def add_train():
 
     flash(f'Train "{train_name}" has been added successfully!', 'success')
     return redirect(url_for('admin_dashboard'))
+
+@app.route('/change_password', methods=['POST'])
+def change_password():
+    if not session.get('logged_in'):
+        flash('You must be logged in to change your password.', 'danger')
+        return redirect(url_for('login'))
+
+    user = User.query.get(session['user_id'])
+    current_password = request.form['current_password']
+    new_password = request.form['new_password']
+    confirm_password = request.form['confirm_password']
+
+    if not user.check_password(current_password):
+        flash('Incorrect current password.', 'danger')
+    elif new_password != confirm_password:
+        flash('New password and confirmation do not match.', 'danger')
+    else:
+        user.set_password(new_password)
+        db.session.commit()
+        flash('Password updated successfully!', 'success')
+
+    return redirect(url_for('profile'))
 
 if __name__ == '__main__':
     with app.app_context():

@@ -3,7 +3,6 @@
     perspective: 1000px;
 }
 .modal {
-    --bs-modal-bg: transparent;
     --bs-modal-border-color: transparent;
 }
 .modal-dialog {

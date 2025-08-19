@@ -1,0 +1,15 @@
+
+.profile-image-container {
+    padding-top: 1rem;
+    padding-bottom: 1.5rem;
+}
+
+.profile-image-container svg {
+    display: block;
+    margin: auto;
+}
+
+/* Styles for the change password modal and its form */
+.change-password-modal .modal-content {
+    border-radius: 0.5rem;
+}
