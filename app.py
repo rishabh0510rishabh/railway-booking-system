@@ -48,7 +48,7 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
     role = db.Column(db.String(20), nullable=False, default='user') # Roles: 'user' or 'admin'
-    email = db.Column(db.String(20), nullable=False, default='user')
+    email = db.Column(db.String(100), nullable=True)
     phone_number = db.Column(db.String(20), nullable=True)
 
     def set_password(self, password):
@@ -94,6 +94,10 @@ def generate_pnr():
 
 @app.route('/book/<int:train_id>')
 def book(train_id):
+    if not session.get('logged_in'):
+        flash('You must be logged in to book a ticket.', 'danger')
+        return redirect(url_for('login'))
+
     train_to_book = Train.query.get_or_404(train_id)
     
     # Check for seat availability
@@ -131,7 +135,7 @@ def submit_booking():
     db.session.commit()
     
     return redirect(url_for('booking_confirmation', pnr=new_booking.pnr_number))
-# new route to show the confirmation page
+
 @app.route('/confirmation/<pnr>')
 def booking_confirmation(pnr):
     # Find the booking in the database using the PNR
@@ -249,6 +253,17 @@ def my_bookings():
     # Find all bookings linked to the current user's ID
     bookings = Booking.query.filter_by(user_id=user_id).order_by(Booking.id.desc()).all()
     return render_template('my_bookings.html', bookings=bookings)
+
+# This is the new route for the user's profile
+@app.route('/profile')
+def profile():
+    if not session.get('logged_in'):
+        flash('You must be logged in to view your profile.', 'danger')
+        return redirect(url_for('login'))
+    
+    user_id = session['user_id']
+    user = User.query.get_or_404(user_id)
+    return render_template('profile.html', user=user)
 
 # this new route will handle adding a train
 @app.route('/admin/add_train', methods=['POST'])

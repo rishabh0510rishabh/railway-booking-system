@@ -24,31 +24,32 @@
               </li>
             {% endif %}
           </ul>        
-         <!-- Right side of Navbar -->
-         <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
-           {% if session.logged_in %}
-             <!-- Show Admin Panel link ONLY for admins -->
-             {% if session.is_admin %}
-               <li class="nav-item">
-                 <a class="nav-link" href="{{ url_for('admin_dashboard') }}">Admin Panel</a>
-               </li>
-             {% endif %}
-             <!-- User dropdown for all logged-in users -->
-             <li class="nav-item dropdown">
-               <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                 Welcome, {{ session.username }}
-               </a>
-               <ul class="dropdown-menu dropdown-menu-end">
-                 <li><a class="dropdown-item" href="{{ url_for('logout') }}">Logout</a></li>
-               </ul>
-             </li>
-           {% else %}
-             <!-- This button triggers the modal for logged-out users -->
-             <li class="nav-item">
-               <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#authModal">Login / Register</button>
-             </li>
-           {% endif %}
-         </ul>
+          <!-- Right side of Navbar -->
+          <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
+            {% if session.logged_in %}
+              <!-- Show Admin Panel link ONLY for admins -->
+              {% if session.is_admin %}
+                <li class="nav-item">
+                  <a class="nav-link" href="{{ url_for('admin_dashboard') }}">Admin Panel</a>
+                </li>
+              {% endif %}
+              <!-- User dropdown for all logged-in users -->
+              <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                  Welcome, {{ session.username }}
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li><a class="dropdown-item" href="{{ url_for('profile') }}">Profile</a></li>
+                  <li><a class="dropdown-item" href="{{ url_for('logout') }}">Logout</a></li>
+                </ul>
+              </li>
+            {% else %}
+              <!-- This button triggers the modal for logged-out users -->
+              <li class="nav-item">
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#authModal">Login / Register</button>
+              </li>
+            {% endif %}
+          </ul>
         
           <!-- PNR Search Form (remains on the far right) -->
           <form class="d-flex ms-3" action="{{ url_for('pnr_status') }}" method="get">
