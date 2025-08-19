@@ -1,5 +1,6 @@
 import os
-from app import app, db, Train, User, Booking, generate_pnr
+import random
+from app import app, db, Train, User, Booking, generate_pnr, Passenger
 
 # --- Configuration ---
 DB_FILE = 'railway.db'
@@ -18,13 +19,13 @@ with app.app_context():
     # 1. Add Users
     print("Adding default users...")
     
-    # Create and add the admin user with email and phone_number
-    admin_user = User(username='admin', role='admin', email='admin@example.com', phone_number='1234567890')
+    # Create and add the admin user with email, phone, and profile picture
+    admin_user = User(username='admin', role='admin', email='admin@example.com', phone_number='1234567890', profile_picture='default_profile.png')
     admin_user.set_password('password123')
     db.session.add(admin_user)
 
-    # Create and add a test user with email and phone_number
-    test_user = User(username='testuser', role='user', email='testuser@example.com', phone_number='0987654321')
+    # Create and add a test user with email, phone, and profile picture
+    test_user = User(username='testuser', role='user', email='testuser@example.com', phone_number='0987654321', profile_picture='default_profile.png')
     test_user.set_password('password')
     db.session.add(test_user)
     
@@ -56,23 +57,44 @@ with app.app_context():
     admin_id = User.query.filter_by(username='admin').first().id
     test_user_id = User.query.filter_by(username='testuser').first().id
 
+    # Add saved passengers
+    db.session.add(Passenger(user_id=test_user_id, name='Alice Smith', age=34, berth_preference='Upper'))
+    db.session.add(Passenger(user_id=test_user_id, name='Bob Johnson', age=45, berth_preference='Lower'))
+    db.session.add(Passenger(user_id=admin_id, name='Charlie Brown', age=65, berth_preference='Lower'))
+    db.session.commit()
+    print("-> Saved passengers added.")
+
+    # A helper function to randomly assign berths with a preference for lower for seniors
+    def get_berth_preference(age):
+        if age >= 60:
+            return random.choice(['Lower', 'Side Lower'])
+        return random.choice(['Lower', 'Middle', 'Upper', 'Side Lower', 'Side Upper'])
+
     # Make Shatabdi Express (ID 1, 150 seats) nearly full (5 seats left)
     for i in range(145):
         user_id = test_user_id if i % 2 == 0 else admin_id
-        db.session.add(Booking(pnr_number=generate_pnr(), user_id=user_id, train_id=1, passenger_name=f'Passenger S{i+1}', passenger_age=30, seat_class='Sleeper'))
+        age = random.randint(18, 70)
+        berth = get_berth_preference(age)
+        db.session.add(Booking(pnr_number=generate_pnr(), user_id=user_id, train_id=1, passenger_name=f'Passenger S{i+1}', passenger_age=age, seat_class='Sleeper', berth_preference=berth))
 
     # Make Rajdhani Express (ID 2, 200 seats) nearly full (2 seats left)
     for i in range(198):
         user_id = admin_id if i % 2 == 0 else test_user_id
-        db.session.add(Booking(pnr_number=generate_pnr(), user_id=user_id, train_id=2, passenger_name=f'Passenger R{i+1}', passenger_age=40, seat_class='AC 2 Tier'))
+        age = random.randint(18, 70)
+        berth = get_berth_preference(age)
+        db.session.add(Booking(pnr_number=generate_pnr(), user_id=user_id, train_id=2, passenger_name=f'Passenger R{i+1}', passenger_age=age, seat_class='AC 2 Tier', berth_preference=berth))
 
     # Make Duronto Express (ID 3, 180 seats) COMPLETELY FULL
     for i in range(180):
-        db.session.add(Booking(pnr_number=generate_pnr(), user_id=test_user_id, train_id=3, passenger_name=f'Passenger D{i+1}', passenger_age=25, seat_class='AC 3 Tier'))
+        user_id = test_user_id
+        age = random.randint(18, 70)
+        berth = get_berth_preference(age)
+        db.session.add(Booking(pnr_number=generate_pnr(), user_id=user_id, train_id=3, passenger_name=f'Passenger D{i+1}', passenger_age=age, seat_class='AC 3 Tier', berth_preference=berth))
 
     # Add a few bookings to Tejas Express (ID 4) to leave it mostly available
-    db.session.add(Booking(pnr_number=generate_pnr(), user_id=test_user_id, train_id=4, passenger_name='Alice Smith', passenger_age=34, seat_class='AC 1st Class'))
-    db.session.add(Booking(pnr_number=generate_pnr(), user_id=admin_id, train_id=4, passenger_name='Bob Johnson', passenger_age=45, seat_class='AC 1st Class'))
+    db.session.add(Booking(pnr_number=generate_pnr(), user_id=test_user_id, train_id=4, passenger_name='Alice Smith', passenger_age=34, seat_class='AC 1st Class', berth_preference='Upper'))
+    db.session.add(Booking(pnr_number=generate_pnr(), user_id=admin_id, train_id=4, passenger_name='Bob Johnson', passenger_age=45, seat_class='AC 1st Class', berth_preference='Lower'))
+    db.session.add(Booking(pnr_number=generate_pnr(), user_id=admin_id, train_id=4, passenger_name='Charlie Brown', passenger_age=65, seat_class='AC 1st Class', berth_preference='Side Lower'))
 
     db.session.commit()
     print("-> Realistic bookings added successfully.")

@@ -1,10 +1,13 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, make_response, send_file, session
+import os
+import uuid # Used for generating a unique filename for the profile picture
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory,send_file
 import time
 import random
 import string
 from flask_sqlalchemy import SQLAlchemy
-from fpdf import FPDF
 from werkzeug.security import generate_password_hash, check_password_hash
+from fpdf import FPDF
+from sqlalchemy.orm import relationship
 
 # Initialize the Flask app
 app = Flask(__name__)
@@ -13,6 +16,13 @@ app.config['SECRET_KEY'] = 'a-very-secret-key-for-flashing'
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///railway.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['UPLOAD_FOLDER'] = 'static/uploads/profiles'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max file size
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+# Ensure the upload folder exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
 
 # Initialize SQLAlchemy with your Flask app
 db = SQLAlchemy(app)
@@ -25,23 +35,7 @@ class Train(db.Model):
     destination = db.Column(db.String(100), nullable=False)
     departure_time = db.Column(db.String(10), nullable=False) # e.g., '06:15'
     total_seats = db.Column(db.Integer, nullable=False)
-
-class Booking(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    pnr_number = db.Column(db.String(20), unique=True, nullable=False)
-    train_id = db.Column(db.Integer, db.ForeignKey('train.id'), nullable=False)
-
-    # Add this user_id foreign key
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-
-    passenger_name = db.Column(db.String(100), nullable=False)
-    passenger_age = db.Column(db.Integer, nullable=False)
-    seat_class = db.Column(db.String(50), nullable=False, default='Sleeper')
-    status = db.Column(db.String(20), default='Confirmed')
-
-    train = db.relationship('Train', backref=db.backref('bookings', lazy=True))
-    # Add this relationship to the User model
-    user = db.relationship('User', backref=db.backref('bookings', lazy=True))
+    bookings = db.relationship('Booking', backref='train', lazy=True)
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -50,12 +44,37 @@ class User(db.Model):
     role = db.Column(db.String(20), nullable=False, default='user') # Roles: 'user' or 'admin'
     email = db.Column(db.String(100), nullable=True)
     phone_number = db.Column(db.String(20), nullable=True)
+    profile_picture = db.Column(db.String(255), nullable=True)
+    bookings = db.relationship('Booking', backref='user', lazy=True)
+    saved_passengers = db.relationship('Passenger', backref='user', lazy=True, cascade="all, delete-orphan")
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+class Passenger(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    age = db.Column(db.Integer, nullable=False)
+    berth_preference = db.Column(db.String(50), nullable=True)
+    
+class Booking(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    pnr_number = db.Column(db.String(20), unique=True, nullable=False)
+    train_id = db.Column(db.Integer, db.ForeignKey('train.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    passenger_name = db.Column(db.String(100), nullable=False)
+    passenger_age = db.Column(db.Integer, nullable=False)
+    seat_class = db.Column(db.String(50), nullable=False, default='Sleeper')
+    berth_preference = db.Column(db.String(50), nullable=True)  # New column for berth preference
+    status = db.Column(db.String(20), default='Confirmed')
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @app.route('/')
 def index():
@@ -107,8 +126,11 @@ def book(train_id):
     if available_seats <= 0:
         flash('Sorry, no seats available on this train.', 'danger') # 'danger' is a bootstrap class for red alerts
         return redirect(url_for('index')) # Redirect back to home/search page
+    
+    user_id = session['user_id']
+    saved_passengers = Passenger.query.filter_by(user_id=user_id).all()
 
-    return render_template('booking_form.html', train=train_to_book)
+    return render_template('booking_form.html', train=train_to_book, saved_passengers=saved_passengers)
 
 
 @app.route('/submit_booking', methods=['POST'])
@@ -119,19 +141,52 @@ def submit_booking():
 
     train_id = request.form['train_id']
     passenger_name = request.form['passenger_name']
-    passenger_age = request.form['passenger_age']
+    passenger_age = int(request.form['passenger_age'])
     seat_class = request.form['seat_class']
+    requested_berth = request.form.get('berth_preference')
+    save_passenger = request.form.get('save_passenger')
+
+    # Logic for assigning berth preference
+    final_berth_preference = None
+    berth_options = ['Lower', 'Middle', 'Upper', 'Side Lower', 'Side Upper']
+    
+    # Rule: If age >= 60, only allow Lower or Side Lower
+    if passenger_age >= 60:
+        berth_options = ['Lower', 'Side Lower']
+        if requested_berth not in berth_options:
+            final_berth_preference = random.choice(berth_options)
+        else:
+            final_berth_preference = requested_berth
+    else:
+        # 60% chance to get the preferred berth if selected, otherwise random
+        if requested_berth and random.random() < 0.6:
+            final_berth_preference = requested_berth
+        else:
+            final_berth_preference = random.choice(berth_options)
 
     new_booking = Booking(
         pnr_number=generate_pnr(),
         train_id=train_id,
-        user_id=session['user_id'], # Link booking to logged-in user
+        user_id=session['user_id'],
         passenger_name=passenger_name,
         passenger_age=passenger_age,
-        seat_class=seat_class
+        seat_class=seat_class,
+        berth_preference=final_berth_preference
     )
     
     db.session.add(new_booking)
+
+    if save_passenger:
+        existing_passenger = Passenger.query.filter_by(user_id=session['user_id'], name=passenger_name, age=passenger_age).first()
+        if not existing_passenger:
+            new_passenger = Passenger(
+                user_id=session['user_id'],
+                name=passenger_name,
+                age=passenger_age,
+                berth_preference=final_berth_preference
+            )
+            db.session.add(new_passenger)
+    
     db.session.commit()
     
     return redirect(url_for('booking_confirmation', pnr=new_booking.pnr_number))
@@ -254,7 +309,7 @@ def my_bookings():
     bookings = Booking.query.filter_by(user_id=user_id).order_by(Booking.id.desc()).all()
     return render_template('my_bookings.html', bookings=bookings)
 
-#The route for the user's profile
+# This is the new route for the user's profile
 @app.route('/profile', methods=['GET', 'POST'])
 def profile():
     if not session.get('logged_in'):
@@ -264,57 +319,55 @@ def profile():
     user_id = session['user_id']
     user = User.query.get_or_404(user_id)
 
+    # Handle POST requests with an action parameter
     if request.method == 'POST':
-        # ... (handling profile updates)
-        new_username = request.form['username']
-        new_email = request.form['email']
-        new_phone = request.form['phone']
-
-        # Check if the new username is already in use by another user
-        if new_username != user.username and User.query.filter_by(username=new_username).first():
-            flash('This username is already taken. Please choose a different one.', 'danger')
-            return redirect(url_for('profile'))
-
-        # Update user information
-        user.username = new_username
-        user.email = new_email
-        user.phone_number = new_phone
+        action = request.args.get('action')
         
-        db.session.commit()
-        session['username'] = user.username # Update the session with the new username
-        flash('Profile updated successfully!', 'success')
-        return redirect(url_for('profile'))
+        if action == 'add_passenger':
+            name = request.form['passenger_name']
+            age = request.form['passenger_age']
+            berth_preference = request.form.get('berth_preference')
+            new_passenger = Passenger(user_id=user_id, name=name, age=age, berth_preference=berth_preference)
+            db.session.add(new_passenger)
+            db.session.commit()
+            flash(f'Passenger "{name}" added successfully!', 'success')
+            return redirect(url_for('profile'))
+        
+        elif action == 'delete_passenger':
+            passenger_id = request.args.get('passenger_id')
+            passenger_to_delete = Passenger.query.filter_by(id=passenger_id, user_id=user_id).first_or_404()
+            db.session.delete(passenger_to_delete)
+            db.session.commit()
+            flash('Saved passenger removed.', 'info')
+            return redirect(url_for('profile'))
+        
+        else: # Handle standard profile updates
+            new_username = request.form['username']
+            new_email = request.form['email']
+            new_phone = request.form['phone']
+
+            if new_username != user.username and User.query.filter_by(username=new_username).first():
+                flash('This username is already taken. Please choose a different one.', 'danger')
+                return redirect(url_for('profile'))
+
+            user.username = new_username
+            user.email = new_email
+            user.phone_number = new_phone
+            
+            db.session.commit()
+            session['username'] = user.username
+            flash('Profile updated successfully!', 'success')
+            return redirect(url_for('profile'))
     
     # Fetch user's recent bookings for the summary
     recent_bookings = Booking.query.filter_by(user_id=user_id).order_by(Booking.id.desc()).limit(5).all()
+    
+    # Fetch user's saved passengers
+    saved_passengers = Passenger.query.filter_by(user_id=user_id).all()
 
-    return render_template('profile.html', user=user, recent_bookings=recent_bookings)
+    return render_template('profile.html', user=user, recent_bookings=recent_bookings, saved_passengers=saved_passengers)
 
-# this new route will handle adding a train
-@app.route('/admin/add_train', methods=['POST'])
-def add_train():
-    if not session.get('is_admin'):
-        return redirect(url_for('login'))
-
-    train_name = request.form['train_name']
-    source = request.form['source']
-    destination = request.form['destination']
-    departure_time = request.form['departure_time']
-    total_seats = request.form['total_seats']
-
-    new_train = Train(
-        train_name=train_name,
-        source=source,
-        destination=destination,
-        departure_time=departure_time,
-        total_seats=total_seats
-    )
-    db.session.add(new_train)
-    db.session.commit()
-
-    flash(f'Train "{train_name}" has been added successfully!', 'success')
-    return redirect(url_for('admin_dashboard'))
-
+# A new route for handling password changes
 @app.route('/change_password', methods=['POST'])
 def change_password():
     if not session.get('logged_in'):
@@ -346,7 +399,8 @@ def delete_account():
     user_id = session['user_id']
     user = User.query.get_or_404(user_id)
 
-    # First, delete all bookings associated with the user
+    # First, delete all bookings and saved passengers associated with the user
+    Passenger.query.filter_by(user_id=user_id).delete()
     Booking.query.filter_by(user_id=user_id).delete()
     
     # Then, delete the user themselves
@@ -356,6 +410,31 @@ def delete_account():
     session.clear()
     flash('Your account has been successfully deleted.', 'info')
     return redirect(url_for('index'))
+
+# this new route will handle adding a train
+@app.route('/admin/add_train', methods=['POST'])
+def add_train():
+    if not session.get('is_admin'):
+        return redirect(url_for('login'))
+
+    train_name = request.form['train_name']
+    source = request.form['source']
+    destination = request.form['destination']
+    departure_time = request.form['departure_time']
+    total_seats = request.form['total_seats']
+
+    new_train = Train(
+        train_name=train_name,
+        source=source,
+        destination=destination,
+        departure_time=departure_time,
+        total_seats=total_seats
+    )
+    db.session.add(new_train)
+    db.session.commit()
+
+    flash(f'Train "{train_name}" has been added successfully!', 'success')
+    return redirect(url_for('admin_dashboard'))
 
 if __name__ == '__main__':
     with app.app_context():

@@ -1,35 +1,93 @@
 {% extends 'base.html' %}
 
 {% block content %}
-  <div class="card bg-light p-4">
-    <h1 class="display-6 mb-3">Book Ticket</h1>
-    <h5 class="mb-4 text-muted">Train: {{ train.train_name }} ({{ train.source }} to {{ train.destination }})</h5>
+<div class="card bg-light p-4">
+  <h1 class="display-6 mb-3">Book Ticket</h1>
+  <h5 class="mb-4 text-muted">Train: {{ train.train_name }} ({{ train.source }} to {{ train.destination }})</h5>
+  
+  <form action="{{ url_for('submit_booking') }}" method="post">
+    <input type="hidden" name="train_id" value="{{ train.id }}">
     
-    <form action="{{ url_for('submit_booking') }}" method="post">
-      <input type="hidden" name="train_id" value="{{ train.id }}">
-      
-      <div class="mb-3">
-        <label for="passenger_name" class="form-label">Passenger Name:</label>
-        <input type="text" class="form-control" id="passenger_name" name="passenger_name" required>
-      </div>
+    <!-- Saved Passengers Dropdown -->
+    {% if saved_passengers %}
+    <div class="mb-3">
+      <label for="saved_passenger" class="form-label">Or select from saved passengers:</label>
+      <select class="form-select" id="saved_passenger">
+        <option value="">-- Select a passenger --</option>
+        {% for passenger in saved_passengers %}
+          <option value="{{ passenger.name }},{{ passenger.age }},{{ passenger.berth_preference or '' }}">{{ passenger.name }} ({{ passenger.age }} years old){% if passenger.berth_preference %} - {{ passenger.berth_preference }}{% endif %}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
 
-      <!-- Add this Seat Class Dropdown -->
-      <div class="mb-3">
-        <label for="seat_class" class="form-label">Seat Class:</label>
-        <select class="form-select" id="seat_class" name="seat_class">
-          <option>Sleeper</option>
-          <option>AC 3 Tier</option>
-          <option>AC 2 Tier</option>
-          <option>AC 1st Class</option>
-        </select>
-      </div>
-      
-      <div class="mb-3">
-        <label for="passenger_age" class="form-label">Age:</label>
-        <input type="number" class="form-control" id="passenger_age" name="passenger_age" min="1" required>
-      </div>
-      
-      <button type="submit" class="btn btn-primary">Confirm Booking</button>
-    </form>
-  </div>
+    <div class="mb-3">
+      <label for="passenger_name" class="form-label">Passenger Name:</label>
+      <input type="text" class="form-control" id="passenger_name" name="passenger_name" required>
+    </div>
+    
+    <div class="mb-3">
+      <label for="passenger_age" class="form-label">Age:</label>
+      <input type="number" class="form-control" id="passenger_age" name="passenger_age" min="1" required>
+    </div>
+
+    <!-- Add this Seat Class Dropdown -->
+    <div class="mb-3">
+      <label for="seat_class" class="form-label">Seat Class:</label>
+      <select class="form-select" id="seat_class" name="seat_class">
+        <option>Sleeper</option>
+        <option>AC 3 Tier</option>
+        <option>AC 2 Tier</option>
+        <option>AC 1st Class</option>
+      </select>
+    </div>
+    
+    <!-- Berth Preference Selector -->
+    <div class="mb-3">
+      <label for="berth_preference" class="form-label">Berth Preference (Optional):</label>
+      <select class="form-select" id="berth_preference" name="berth_preference">
+        <option value="">No Preference</option>
+        <option>Lower</option>
+        <option>Middle</option>
+        <option>Upper</option>
+        <option>Side Lower</option>
+        <option>Side Upper</option>
+      </select>
+    </div>
+
+    <div class="form-check mb-3">
+      <input class="form-check-input" type="checkbox" name="save_passenger" id="save_passenger">
+      <label class="form-check-label" for="save_passenger">
+        Save these passenger details for future use
+      </label>
+    </div>
+    
+    <button type="submit" class="btn btn-primary">Confirm Booking</button>
+  </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const savedPassengerDropdown = document.getElementById('saved_passenger');
+    const passengerNameInput = document.getElementById('passenger_name');
+    const passengerAgeInput = document.getElementById('passenger_age');
+    const berthPreferenceInput = document.getElementById('berth_preference');
+
+    if (savedPassengerDropdown) {
+        savedPassengerDropdown.addEventListener('change', function() {
+            const selectedValue = this.value;
+            if (selectedValue) {
+                const [name, age, berth] = selectedValue.split(',');
+                passengerNameInput.value = name;
+                passengerAgeInput.value = age;
+                berthPreferenceInput.value = berth;
+            } else {
+                passengerNameInput.value = '';
+                passengerAgeInput.value = '';
+                berthPreferenceInput.value = '';
+            }
+        });
+    }
+});
+</script>
 {% endblock %}
