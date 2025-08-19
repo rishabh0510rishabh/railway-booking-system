@@ -1,52 +1,83 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-md-8">
-    <div class="card shadow-sm">
-      <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-        <h4 class="mb-0">User Profile</h4>
-        <div>
-          <button id="edit-profile-btn" class="btn btn-sm btn-warning">Edit Profile</button>
-          <button type="button" class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#changePasswordModal">Change Password</button>
-          <a href="{{ url_for('my_bookings') }}" class="btn btn-sm btn-primary">View My Bookings</a>
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-md-7 mb-4">
+      <!-- Profile Information Card -->
+      <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+          <h4 class="mb-0">User Profile</h4>
+          <div class="d-flex flex-wrap justify-content-end">
+            <button id="edit-profile-btn" class="btn btn-sm btn-warning me-2 mb-1">Edit Profile</button>
+            <button type="button" class="btn btn-sm btn-danger me-2 mb-1" data-bs-toggle="modal" data-bs-target="#deleteAccountModal">Delete Account</button>
+            <button type="button" class="btn btn-sm btn-info me-2 mb-1" data-bs-toggle="modal" data-bs-target="#changePasswordModal">Change Password</button>
+            <a href="{{ url_for('my_bookings') }}" class="btn btn-sm btn-primary mb-1">View My Bookings</a>
+          </div>
+        </div>
+        <div class="card-body text-center">
+          <!-- Profile Image Placeholder -->
+          <div class="mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" fill="currentColor" class="bi bi-person-circle text-secondary" viewBox="0 0 16 16">
+              <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/>
+              <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1"/>
+            </svg>
+          </div>
+
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                  {{ message }}
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+          
+          <form id="profile-form" action="{{ url_for('profile') }}" method="post" class="text-start">
+            <div class="mb-3">
+              <label for="username" class="form-label">Username</label>
+              <input type="text" class="form-control" id="username" name="username" value="{{ user.username }}" disabled>
+            </div>
+            <div class="mb-3">
+              <label for="email" class="form-label">Email</label>
+              <input type="email" class="form-control" id="email" name="email" value="{{ user.email or '' }}" disabled>
+            </div>
+            <div class="mb-3">
+              <label for="phone" class="form-label">Phone Number</label>
+              <input type="tel" class="form-control" id="phone" name="phone" value="{{ user.phone_number or '' }}" disabled>
+            </div>
+            <button type="submit" id="save-changes-btn" class="btn btn-success" disabled>Save Changes</button>
+          </form>
         </div>
       </div>
-      <div class="card-body text-center">
-        <!-- Profile Image Placeholder -->
-        <div class="mb-4">
-          <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" fill="currentColor" class="bi bi-person-circle text-secondary" viewBox="0 0 16 16">
-            <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/>
-            <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1"/>
-          </svg>
+    </div>
+    <div class="col-md-5 mb-4">
+      <!-- Booking Summary Card -->
+      <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Recent Bookings</h5>
+          <a href="{{ url_for('my_bookings') }}" class="btn btn-sm btn-light">View All</a>
         </div>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for category, message in messages %}
-              <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-              </div>
-            {% endfor %}
+        <div class="card-body">
+          {% if recent_bookings %}
+            <div class="list-group">
+              {% for booking in recent_bookings %}
+                <a href="{{ url_for('pnr_status', pnr=booking.pnr_number) }}" class="list-group-item list-group-item-action">
+                  <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">{{ booking.train.train_name }} ({{ booking.train.source }} to {{ booking.train.destination }})</h6>
+                    <small>PNR: {{ booking.pnr_number }}</small>
+                  </div>
+                  <p class="mb-1">Passenger: {{ booking.passenger_name }} | Class: {{ booking.seat_class }}</p>
+                  <small>Status: <span class="badge bg-primary">{{ booking.status }}</span></small>
+                </a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="alert alert-info mb-0">You have no recent bookings.</div>
           {% endif %}
-        {% endwith %}
-        
-        <form id="profile-form" action="{{ url_for('profile') }}" method="post" class="text-start">
-          <div class="mb-3">
-            <label for="username" class="form-label">Username</label>
-            <input type="text" class="form-control" id="username" name="username" value="{{ user.username }}" disabled>
-          </div>
-          <div class="mb-3">
-            <label for="email" class="form-label">Email</label>
-            <input type="email" class="form-control" id="email" name="email" value="{{ user.email or '' }}" disabled>
-          </div>
-          <div class="mb-3">
-            <label for="phone" class="form-label">Phone Number</label>
-            <input type="tel" class="form-control" id="phone" name="phone" value="{{ user.phone_number or '' }}" disabled>
-          </div>
-          <button type="submit" id="save-changes-btn" class="btn btn-success" disabled>Save Changes</button>
-        </form>
+        </div>
       </div>
     </div>
   </div>
@@ -80,6 +111,27 @@
           <button type="submit" class="btn btn-primary">Save Changes</button>
         </div>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Account Confirmation Modal -->
+<div class="modal fade" id="deleteAccountModal" tabindex="-1" aria-labelledby="deleteAccountModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteAccountModalLabel">Confirm Account Deletion</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to delete your account? This action is permanent and cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form action="{{ url_for('delete_account') }}" method="post" style="display:inline;">
+          <button type="submit" class="btn btn-danger">Delete My Account</button>
+        </form>
+      </div>
     </div>
   </div>
 </div>

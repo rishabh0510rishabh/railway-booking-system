@@ -265,6 +265,7 @@ def profile():
     user = User.query.get_or_404(user_id)
 
     if request.method == 'POST':
+        # ... (handling profile updates)
         new_username = request.form['username']
         new_email = request.form['email']
         new_phone = request.form['phone']
@@ -284,7 +285,10 @@ def profile():
         flash('Profile updated successfully!', 'success')
         return redirect(url_for('profile'))
     
-    return render_template('profile.html', user=user)
+    # Fetch user's recent bookings for the summary
+    recent_bookings = Booking.query.filter_by(user_id=user_id).order_by(Booking.id.desc()).limit(5).all()
+
+    return render_template('profile.html', user=user, recent_bookings=recent_bookings)
 
 # this new route will handle adding a train
 @app.route('/admin/add_train', methods=['POST'])
@@ -332,6 +336,26 @@ def change_password():
         flash('Password updated successfully!', 'success')
 
     return redirect(url_for('profile'))
+
+@app.route('/profile/delete', methods=['POST'])
+def delete_account():
+    if not session.get('logged_in'):
+        flash('You must be logged in to delete your account.', 'danger')
+        return redirect(url_for('login'))
+
+    user_id = session['user_id']
+    user = User.query.get_or_404(user_id)
+
+    # First, delete all bookings associated with the user
+    Booking.query.filter_by(user_id=user_id).delete()
+    
+    # Then, delete the user themselves
+    db.session.delete(user)
+    db.session.commit()
+
+    session.clear()
+    flash('Your account has been successfully deleted.', 'info')
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
     with app.app_context():
