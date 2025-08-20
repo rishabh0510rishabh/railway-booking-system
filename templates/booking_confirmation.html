@@ -18,7 +18,9 @@
       <p><strong>Route:</strong> {{ booking.train.source }} to {{ booking.train.destination }}</p>
       <p><strong>Departure:</strong> {{ booking.train.departure_time }}</p>
       <p><strong>Seat Class:</strong> {{ booking.seat_class }}</p> 
-      <p><strong>Allotted Berth:</strong> {{ booking.berth_preference or 'N/A' }}</p>
+      <p><strong>Berth/Seat:</strong> {{ booking.seat_number or 'N/A' }}</p>
+      <p><strong>Final Status:</strong> <span class="badge bg-primary">{{ booking.status }}</span></p>
+      <p><strong>Fare Paid:</strong> <span class="fw-bold text-success">${{ booking.fare|round(2) }}</span></p>
     </div>
   </div>
 
