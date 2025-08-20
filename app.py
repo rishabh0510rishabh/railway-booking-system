@@ -80,8 +80,8 @@ class Booking(db.Model):
     seat_class = db.Column(db.String(50), nullable=False, default='Sleeper')
     berth_preference = db.Column(db.String(50), nullable=True)
     status = db.Column(db.String(20), default='Confirmed')
-    seat_number = db.Column(db.String(20), nullable=True) # New column for detailed seat number
-    fare = db.Column(db.Float, nullable=False, default=0.0) # New column for fare
+    seat_number = db.Column(db.String(20), nullable=True)
+    fare = db.Column(db.Float, nullable=False, default=0.0)
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -510,4 +510,3 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     app.run(debug=True)
-    
