@@ -224,6 +224,7 @@ def download_ticket(pnr):
     pdf.set_font("Helvetica", "", 12)
     pdf.cell(0, 10, f"PNR Number: {booking.pnr_number}", 0, 1)
     pdf.cell(0, 10, f"Passenger: {booking.passenger_name}, Age: {booking.passenger_age}", 0, 1)
+    pdf.cell(0, 10, f"Berth Preference: {booking.berth_preference}", 0, 1) 
     pdf.cell(0, 10, f"Train: {booking.train.train_name}", 0, 1)
     pdf.cell(0, 10, f"Route: {booking.train.source} to {booking.train.destination}", 0, 1)
     pdf.cell(0, 10, f"Departure Time: {booking.train.departure_time}", 0, 1)
