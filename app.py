@@ -1,9 +1,10 @@
 import os
-import uuid # Used for generating a unique filename for the profile picture
-from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory,send_file
+import uuid 
 import time
 import random
 import string
+import math
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory, send_file
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from fpdf import FPDF
@@ -13,7 +14,7 @@ from sqlalchemy.orm import relationship
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'a-very-secret-key-for-flashing'
 
-
+# Configure database and upload folders
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///railway.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'static/uploads/profiles'
@@ -23,11 +24,19 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 # Ensure the upload folder exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-
 # Initialize SQLAlchemy with your Flask app
 db = SQLAlchemy(app)
 
+# Define constants for fare and booking statuses
+BASE_FARE = 1000
+SEATS_PER_COACH = {
+    'Sleeper': 72,
+    'AC 3 Tier': 64,
+    'AC 2 Tier': 46,
+    'AC 1st Class': 18
+}
 
+# --- Database Models ---
 class Train(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     train_name = db.Column(db.String(100), nullable=False)
@@ -69,13 +78,66 @@ class Booking(db.Model):
     passenger_name = db.Column(db.String(100), nullable=False)
     passenger_age = db.Column(db.Integer, nullable=False)
     seat_class = db.Column(db.String(50), nullable=False, default='Sleeper')
-    berth_preference = db.Column(db.String(50), nullable=True)  # New column for berth preference
+    berth_preference = db.Column(db.String(50), nullable=True)
     status = db.Column(db.String(20), default='Confirmed')
+    seat_number = db.Column(db.String(20), nullable=True) # New column for detailed seat number
+    fare = db.Column(db.Float, nullable=False, default=0.0) # New column for fare
 
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# --- Helper Functions ---
+def generate_pnr():
+    """Generates a unique PNR number."""
+    timestamp_part = str(int(time.time()))[-6:]
+    random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    return f"PNR{timestamp_part}{random_part}"
+
+def calculate_fare(seat_class):
+    """Calculates fare based on seat class."""
+    fare_multipliers = {
+        'Sleeper': 1.0,
+        'AC 3 Tier': 1.5,
+        'AC 2 Tier': 2.0,
+        'AC 1st Class': 3.0
+    }
+    return BASE_FARE * fare_multipliers.get(seat_class, 1.0)
+
+def generate_seat_number(booking_count, total_seats, seat_class):
+    """Generates a detailed seat number based on booking count and coach class.
+    
+    This function assigns a seat number in the format 'Coach-Seat-Berth'
+    (e.g., 'S1-32-SL' for Sleeper Class, Coach 1, Seat 32, Side Lower Berth).
+    """
+    seats_in_coach = SEATS_PER_COACH.get(seat_class, 72)
+    
+    # Calculate Coach and Seat number
+    coach_number = math.ceil(booking_count / seats_in_coach)
+    seat_in_coach = booking_count % seats_in_coach
+    if seat_in_coach == 0:
+        seat_in_coach = seats_in_coach
+    
+    # Map seat number to a berth type
+    berth_map = {
+        'Sleeper': {1: 'SL', 2: 'LB', 3: 'MB', 4: 'UB', 5: 'SL', 6: 'SU'},
+        'AC 3 Tier': {1: 'LB', 2: 'MB', 3: 'UB', 4: 'SL', 5: 'SU'},
+        'AC 2 Tier': {1: 'LB', 2: 'UB', 3: 'SL', 4: 'SU'},
+        'AC 1st Class': {1: 'LB', 2: 'UB'}
+    }
+    
+    # Use modulo to cycle through berths for the given class
+    berth_abbreviation = 'S'
+    if seat_class in berth_map:
+        berth_options = list(berth_map[seat_class].values())
+        berth_abbreviation = berth_options[(seat_in_coach - 1) % len(berth_options)]
+
+    # Get the first letter of the class for the coach name
+    class_initial = seat_class[0].upper()
+
+    return f"{class_initial}{coach_number}-{seat_in_coach}-{berth_abbreviation}"
+
+# --- Routes ---
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -86,10 +148,8 @@ def search():
     destination = request.form['destination']
     time_filter = request.form['time_filter']
 
-    # Start with the basic query
     query = Train.query.filter_by(source=source, destination=destination)
 
-    # Apply time filter if not 'all'
     if time_filter == 'morning':
         query = query.filter(Train.departure_time >= '05:00', Train.departure_time < '12:00')
     elif time_filter == 'afternoon':
@@ -100,16 +160,10 @@ def search():
     trains = query.all()
     
     for train in trains:
-        confirmed_bookings = Booking.query.filter_by(train_id=train.id).count()
+        confirmed_bookings = Booking.query.filter_by(train_id=train.id, status='Confirmed').count()
         train.available_seats = train.total_seats - confirmed_bookings
         
     return render_template('results.html', trains=trains, source=source, destination=destination)
-
-def generate_pnr():
-    # Generates a unique PNR number
-    timestamp_part = str(int(time.time()))[-6:]
-    random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
-    return f"PNR{timestamp_part}{random_part}"
 
 @app.route('/book/<int:train_id>')
 def book(train_id):
@@ -119,19 +173,26 @@ def book(train_id):
 
     train_to_book = Train.query.get_or_404(train_id)
     
-    # Check for seat availability
-    confirmed_bookings = Booking.query.filter_by(train_id=train_id).count()
-    available_seats = train_to_book.total_seats - confirmed_bookings
+    # Check for seat availability based on Confirmed and RAC
+    confirmed_count = Booking.query.filter_by(train_id=train_id, status='Confirmed').count()
+    rac_count = Booking.query.filter_by(train_id=train_id, status='RAC').count()
     
-    if available_seats <= 0:
-        flash('Sorry, no seats available on this train.', 'danger') # 'danger' is a bootstrap class for red alerts
-        return redirect(url_for('index')) # Redirect back to home/search page
+    total_confirmed_rac = confirmed_count + rac_count
+    
+    # RAC tickets are counted as half seats, so we have a larger capacity
+    rac_limit = train_to_book.total_seats + (train_to_book.total_seats // 10) 
+    
+    if total_confirmed_rac >= rac_limit:
+        # If RAC is also full, check waitlist availability (e.g., up to 10% of total seats)
+        waitlist_count = Booking.query.filter_by(train_id=train_id, status='Waitlisted').count()
+        if waitlist_count >= train_to_book.total_seats * 0.1:
+            flash('Sorry, this train is fully waitlisted.', 'danger')
+            return redirect(url_for('index'))
     
     user_id = session['user_id']
     saved_passengers = Passenger.query.filter_by(user_id=user_id).all()
 
     return render_template('booking_form.html', train=train_to_book, saved_passengers=saved_passengers)
-
 
 @app.route('/submit_booking', methods=['POST'])
 def submit_booking():
@@ -145,24 +206,36 @@ def submit_booking():
     seat_class = request.form['seat_class']
     requested_berth = request.form.get('berth_preference')
     save_passenger = request.form.get('save_passenger')
-
-    # Logic for assigning berth preference
-    final_berth_preference = None
-    berth_options = ['Lower', 'Middle', 'Upper', 'Side Lower', 'Side Upper']
     
-    # Rule: If age >= 60, only allow Lower or Side Lower
-    if passenger_age >= 60:
-        berth_options = ['Lower', 'Side Lower']
-        if requested_berth not in berth_options:
-            final_berth_preference = random.choice(berth_options)
-        else:
-            final_berth_preference = requested_berth
+    # Fetch train details
+    train_to_book = Train.query.get_or_404(train_id)
+    
+    # Calculate current booking counts for this train
+    confirmed_bookings = Booking.query.filter_by(train_id=train_id, status='Confirmed').count()
+    rac_bookings = Booking.query.filter_by(train_id=train_id, status='RAC').count()
+    waitlisted_bookings = Booking.query.filter_by(train_id=train_id, status='Waitlisted').count()
+
+    # Determine the status and seat number of the new booking
+    status = 'Confirmed'
+    seat_number = None
+    
+    rac_limit = train_to_book.total_seats + 10 # Let's set a fixed number of RAC seats
+    
+    if confirmed_bookings < train_to_book.total_seats:
+        status = 'Confirmed'
+        booking_count = confirmed_bookings + 1
+        seat_number = generate_seat_number(booking_count, train_to_book.total_seats, seat_class)
+    elif confirmed_bookings + rac_bookings < rac_limit:
+        status = 'RAC'
+        rac_number = rac_bookings + 1
+        seat_number = f"RAC-{rac_number}"
     else:
-        # 60% chance to get the preferred berth if selected, otherwise random
-        if requested_berth and random.random() < 0.6:
-            final_berth_preference = requested_berth
-        else:
-            final_berth_preference = random.choice(berth_options)
+        status = 'Waitlisted'
+        waitlist_number = waitlisted_bookings + 1
+        seat_number = f"WL-{waitlist_number}"
+
+    # Calculate the fare
+    fare = calculate_fare(seat_class)
 
     new_booking = Booking(
         pnr_number=generate_pnr(),
@@ -171,7 +244,10 @@ def submit_booking():
         passenger_name=passenger_name,
         passenger_age=passenger_age,
         seat_class=seat_class,
-        berth_preference=final_berth_preference
+        berth_preference=requested_berth,
+        status=status,
+        seat_number=seat_number,
+        fare=fare
     )
     
     db.session.add(new_booking)
@@ -183,7 +259,7 @@ def submit_booking():
                 user_id=session['user_id'],
                 name=passenger_name,
                 age=passenger_age,
-                berth_preference=final_berth_preference
+                berth_preference=requested_berth
             )
             db.session.add(new_passenger)
     
@@ -193,7 +269,6 @@ def submit_booking():
 
 @app.route('/confirmation/<pnr>')
 def booking_confirmation(pnr):
-    # Find the booking in the database using the PNR
     booking_details = Booking.query.filter_by(pnr_number=pnr).first_or_404()
     return render_template('booking_confirmation.html', booking=booking_details)
 
@@ -224,11 +299,18 @@ def download_ticket(pnr):
     pdf.set_font("Helvetica", "", 12)
     pdf.cell(0, 10, f"PNR Number: {booking.pnr_number}", 0, 1)
     pdf.cell(0, 10, f"Passenger: {booking.passenger_name}, Age: {booking.passenger_age}", 0, 1)
-    pdf.cell(0, 10, f"Berth Preference: {booking.berth_preference}", 0, 1) 
+    
+    # Display Berth/Seat details based on status
+    if booking.status == 'Confirmed' or booking.status == 'RAC':
+        pdf.cell(0, 10, f"Berth/Seat: {booking.seat_number}", 0, 1)
+    else:
+        pdf.cell(0, 10, f"Status: {booking.status}", 0, 1)
+
+    pdf.cell(0, 10, f"Seat Class: {booking.seat_class}", 0, 1) 
+    pdf.cell(0, 10, f"Fare Paid: ${booking.fare:.2f}", 0, 1)
     pdf.cell(0, 10, f"Train: {booking.train.train_name}", 0, 1)
     pdf.cell(0, 10, f"Route: {booking.train.source} to {booking.train.destination}", 0, 1)
     pdf.cell(0, 10, f"Departure Time: {booking.train.departure_time}", 0, 1)
-    pdf.cell(0, 10, f"Status: {booking.status}", 0, 1)
 
     # Define the filename for the temporary PDF
     pdf_filename = f"ticket_{pnr}.pdf"
@@ -254,7 +336,6 @@ def signup():
         flash('Email address is already registered.', 'danger')
         return redirect(url_for('index'))
         
-    # --- PASS NEW FIELDS TO THE USER OBJECT ---
     new_user = User(username=username, email=email, phone_number=phone)
     new_user.set_password(password)
     db.session.add(new_user)
@@ -286,12 +367,10 @@ def admin_dashboard():
         flash('You must be an admin to access this page.', 'danger')
         return redirect(url_for('login'))
     
-    # Fetch all data needed for the dashboard
     all_bookings = Booking.query.order_by(Booking.id.desc()).all()
     all_trains = Train.query.order_by(Train.train_name).all()
     
     return render_template('admin_dashboard.html', bookings=all_bookings, trains=all_trains)
-
 
 @app.route('/logout')
 def logout():
@@ -306,11 +385,9 @@ def my_bookings():
         return redirect(url_for('login'))
 
     user_id = session['user_id']
-    # Find all bookings linked to the current user's ID
     bookings = Booking.query.filter_by(user_id=user_id).order_by(Booking.id.desc()).all()
     return render_template('my_bookings.html', bookings=bookings)
 
-# This is the new route for the user's profile
 @app.route('/profile', methods=['GET', 'POST'])
 def profile():
     if not session.get('logged_in'):
@@ -320,7 +397,6 @@ def profile():
     user_id = session['user_id']
     user = User.query.get_or_404(user_id)
 
-    # Handle POST requests with an action parameter
     if request.method == 'POST':
         action = request.args.get('action')
         
@@ -360,15 +436,11 @@ def profile():
             flash('Profile updated successfully!', 'success')
             return redirect(url_for('profile'))
     
-    # Fetch user's recent bookings for the summary
     recent_bookings = Booking.query.filter_by(user_id=user_id).order_by(Booking.id.desc()).limit(5).all()
-    
-    # Fetch user's saved passengers
     saved_passengers = Passenger.query.filter_by(user_id=user_id).all()
 
     return render_template('profile.html', user=user, recent_bookings=recent_bookings, saved_passengers=saved_passengers)
 
-# A new route for handling password changes
 @app.route('/change_password', methods=['POST'])
 def change_password():
     if not session.get('logged_in'):
@@ -400,11 +472,9 @@ def delete_account():
     user_id = session['user_id']
     user = User.query.get_or_404(user_id)
 
-    # First, delete all bookings and saved passengers associated with the user
     Passenger.query.filter_by(user_id=user_id).delete()
     Booking.query.filter_by(user_id=user_id).delete()
     
-    # Then, delete the user themselves
     db.session.delete(user)
     db.session.commit()
 
@@ -412,7 +482,6 @@ def delete_account():
     flash('Your account has been successfully deleted.', 'info')
     return redirect(url_for('index'))
 
-# this new route will handle adding a train
 @app.route('/admin/add_train', methods=['POST'])
 def add_train():
     if not session.get('is_admin'):
@@ -441,3 +510,4 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     app.run(debug=True)
+    
