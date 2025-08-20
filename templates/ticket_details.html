@@ -8,14 +8,23 @@
     </div>
     <div class="card-body">
       <p><strong>PNR Number:</strong> {{ booking.pnr_number }}</p>
-      <p><strong>Status:</strong> <span class="badge bg-primary">{{ booking.status }}</span></p>
+      <p><strong>Status:</strong> <span class="badge 
+      {% if booking.status == 'Confirmed' %}
+        bg-success
+      {% elif booking.status == 'RAC' %}
+        bg-warning text-dark
+      {% else %}
+        bg-info
+      {% endif %}
+      ">{{ booking.status }}</span></p>
       <hr>
       <p><strong>Passenger:</strong> {{ booking.passenger_name }} ({{ booking.passenger_age }} years)</p>
       <p><strong>Train:</strong> {{ booking.train.train_name }}</p>
       <p><strong>Route:</strong> {{ booking.train.source }} to {{ booking.train.destination }}</p>
       <p><strong>Departure:</strong> {{ booking.train.departure_time }}</p>
       <p><strong>Seat Class:</strong> {{ booking.seat_class }}</p>
-      <p><strong>Allotted Berth:</strong> {{ booking.berth_preference or 'N/A' }}</p>
+      <p><strong>Berth/Seat:</strong> {{ booking.seat_number or 'N/A' }}</p>
+      <p><strong>Fare:</strong> <span class="fw-bold text-success">${{ booking.fare|round(2) }}</span></p>
     </div>
   </div>
 {% endblock %}
