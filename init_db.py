@@ -3,6 +3,7 @@ import random
 import time
 import string
 import math
+from datetime import datetime, timedelta, time as dt_time
 from app import app, db, Train, User, Booking, generate_pnr, Passenger, Route
 
 # --- Configuration ---
@@ -56,11 +57,33 @@ def generate_seat_number(booking_count, seat_class):
 
     return f"{class_initial}{coach_number}-{seat_in_coach}-{berth_abbreviation}"
 
-def generate_pnr():
-    """Generates a unique PNR number."""
-    timestamp_part = str(int(time.time()))[-6:]
-    random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
-    return f"PNR{timestamp_part}{random_part}"
+def generate_pnr_unique_in_memory(existing_pnrs):
+    """Generates a unique PNR number not present in the existing set."""
+    while True:
+        timestamp_part = str(int(time.time()))[-6:]
+        random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+        pnr = f"PNR{timestamp_part}{random_part}"
+        if pnr not in existing_pnrs:
+            return pnr
+
+def get_berth_preference(age):
+    if age >= 60:
+        return random.choice(['Lower', 'Side Lower'])
+    return random.choice(['Lower', 'Middle', 'Upper', 'Side Lower', 'Side Upper'])
+
+def random_time_string():
+    """Generates a random time string in HH:MM format."""
+    return f"{random.randint(0, 23):02d}:{random.randint(0, 59):02d}"
+
+def random_city():
+    """Returns a random city name from a predefined list."""
+    cities = ['New Delhi', 'Mumbai', 'Kolkata', 'Chennai', 'Bangalore', 'Hyderabad', 'Pune', 'Ahmedabad', 'Lucknow', 'Jaipur', 'Patna', 'Bhopal']
+    return random.choice(cities)
+
+def random_train_name():
+    """Generates a random train name."""
+    prefixes = ['Express', 'Mail', 'Shatabdi', 'Rajdhani', 'Duronto', 'Superfast']
+    return f"{random.choice(string.ascii_uppercase)}{random.randint(100, 999)} {random.choice(prefixes)}"
 
 
 # --- Main Execution ---
@@ -88,113 +111,143 @@ with app.app_context():
     db.session.commit()
     print("-> Added 'admin' and 'testuser'.")
 
-    # 2. Add Trains
-    print("Adding train data...")
-    train_data = [
-        {'id': 1, 'name': 'Shatabdi Express', 'source': 'New Delhi', 'dest': 'Lucknow', 'time': '06:15', 'arrival': '13:00', 'seats': 150},
-        {'id': 2, 'name': 'Rajdhani Express', 'source': 'Mumbai', 'dest': 'New Delhi', 'time': '17:00', 'arrival': '10:00', 'seats': 200},
-        {'id': 3, 'name': 'Duronto Express', 'source': 'Kolkata', 'dest': 'Pune', 'time': '05:45', 'arrival': '02:30', 'seats': 180},
-        {'id': 4, 'name': 'Tejas Express', 'source': 'Chennai', 'dest': 'Madurai', 'time': '06:00', 'arrival': '12:45', 'seats': 120},
-        {'id': 5, 'name': 'Gatimaan Express', 'source': 'Delhi', 'dest': 'Agra', 'time': '08:10', 'arrival': '10:00', 'seats': 100},
-        {'id': 6, 'name': 'Deccan Queen', 'source': 'Mumbai', 'dest': 'Pune', 'time': '17:10', 'arrival': '21:30', 'seats': 160},
-        {'id': 7, 'name': 'Goa Express', 'source': 'Vasco da Gama', 'dest': 'Delhi', 'time': '15:00', 'arrival': '09:00', 'seats': 190},
-        {'id': 8, 'name': 'Punjab Mail', 'source': 'Mumbai', 'dest': 'Firozpur', 'time': '19:35', 'arrival': '05:00', 'seats': 260},
-        {'id': 9, 'name': 'Bihar Sampark Kranti Exp', 'source': 'New Delhi', 'dest': 'Darbhanga', 'time': '07:40', 'arrival': '05:00', 'seats': 130},
-        # Add a return journey for one of the trains for testing
-        {'id': 10, 'name': 'Rajdhani Express (Return)', 'source': 'New Delhi', 'dest': 'Mumbai', 'time': '17:00', 'arrival': '10:00', 'seats': 200}
-    ]
-    for train_info in train_data:
-        db.session.add(Train(id=train_info['id'], train_name=train_info['name'], source=train_info['source'], destination=train_info['dest'], departure_time=train_info['time'], arrival_time=train_info['arrival'], total_seats=train_info['seats']))
-    db.session.commit()
-    print(f"-> Added {len(train_data)} trains.")
-
-    # 2.5 Add Routes (Stops)
-    print("Adding route stops...")
-    route_data = [
-        # Shatabdi Express
-        {'train_id': 1, 'stop_name': 'Ghaziabad', 'arrival_time': '06:55', 'order': 1},
-        {'train_id': 1, 'stop_name': 'Moradabad', 'arrival_time': '09:00', 'order': 2},
-        {'train_id': 1, 'stop_name': 'Bareilly', 'arrival_time': '10:15', 'order': 3},
-        
-        # Rajdhani Express
-        {'train_id': 2, 'stop_name': 'Vadodara', 'arrival_time': '21:50', 'order': 1},
-        {'train_id': 2, 'stop_name': 'Kota', 'arrival_time': '03:45', 'order': 2},
-        {'train_id': 2, 'stop_name': 'New Delhi', 'arrival_time': '10:00', 'order': 3},
-
-        # Rajdhani Express (Return)
-        {'train_id': 10, 'stop_name': 'Kota', 'arrival_time': '23:45', 'order': 1},
-        {'train_id': 10, 'stop_name': 'Vadodara', 'arrival_time': '05:50', 'order': 2},
-        {'train_id': 10, 'stop_name': 'Mumbai', 'arrival_time': '10:00', 'order': 3}
-    ]
-    for route_info in route_data:
-        db.session.add(Route(train_id=route_info['train_id'], stop_name=route_info['stop_name'], arrival_time=route_info['arrival_time'], stop_order=route_info['order']))
-    db.session.commit()
-    print(f"-> Added {len(route_data)} route stops.")
-
-
-    # 3. Add a large number of realistic bookings
-    print("Adding realistic bookings...")
-    
     admin_id = User.query.filter_by(username='admin').first().id
     test_user_id = User.query.filter_by(username='testuser').first().id
-
+    
+    # Add a few saved passengers for the test user
     db.session.add(Passenger(user_id=test_user_id, name='Alice Smith', age=34, berth_preference='Upper'))
     db.session.add(Passenger(user_id=test_user_id, name='Bob Johnson', age=45, berth_preference='Lower'))
-    db.session.add(Passenger(user_id=admin_id, name='Charlie Brown', age=65, berth_preference='Lower'))
+    db.session.add(Passenger(user_id=test_user_id, name='Charlie Brown', age=65, berth_preference='Lower'))
     db.session.commit()
     print("-> Saved passengers added.")
 
-    def get_berth_preference(age):
-        if age >= 60:
-            return random.choice(['Lower', 'Side Lower'])
-        return random.choice(['Lower', 'Middle', 'Upper', 'Side Lower', 'Side Upper'])
+    # 2. Add a large dataset of trains
+    print("Generating and adding a large dataset of trains...")
+    num_trains = 200
+    all_trains = []
+    for i in range(1, num_trains + 1):
+        source = random_city()
+        destination = random_city()
+        while source == destination:
+            destination = random_city()
+        
+        departure_time_str = random_time_string()
+        departure_dt = datetime.strptime(departure_time_str, '%H:%M')
+        
+        # Ensure arrival is after departure, possibly the next day
+        travel_duration = timedelta(hours=random.randint(1, 20), minutes=random.randint(0, 59))
+        arrival_dt = departure_dt + travel_duration
+        arrival_time_str = arrival_dt.strftime('%H:%M')
 
-    # Make Shatabdi Express (ID 1, 150 seats) nearly full (5 seats left)
-    for i in range(145):
-        user_id = test_user_id if i % 2 == 0 else admin_id
-        age = random.randint(18, 70)
-        berth = get_berth_preference(age)
-        seat_num = generate_seat_number(i + 1, 'Sleeper')
-        fare = calculate_fare('Sleeper')
-        db.session.add(Booking(pnr_number=generate_pnr(), user_id=user_id, train_id=1, passenger_name=f'Passenger S{i+1}', passenger_age=age, seat_class='Sleeper', berth_preference=berth, status='Confirmed', seat_number=seat_num, fare=fare))
-
-    # Make Rajdhani Express (ID 2, 200 seats) nearly full (2 seats left)
-    for i in range(198):
-        user_id = admin_id if i % 2 == 0 else test_user_id
-        age = random.randint(18, 70)
-        berth = get_berth_preference(age)
-        seat_num = generate_seat_number(i + 1, 'AC 2 Tier')
-        fare = calculate_fare('AC 2 Tier')
-        db.session.add(Booking(pnr_number=generate_pnr(), user_id=user_id, train_id=2, passenger_name=f'Passenger R{i+1}', passenger_age=age, seat_class='AC 2 Tier', berth_preference=berth, status='Confirmed', seat_number=seat_num, fare=fare))
-
-    # Make Duronto Express (ID 3, 180 seats) COMPLETELY FULL and then add RAC/WL
-    for i in range(180):
-        user_id = test_user_id
-        age = random.randint(18, 70)
-        berth = get_berth_preference(age)
-        seat_num = generate_seat_number(i + 1, 'AC 3 Tier')
-        fare = calculate_fare('AC 3 Tier')
-        db.session.add(Booking(pnr_number=generate_pnr(), user_id=user_id, train_id=3, passenger_name=f'Passenger D{i+1}', passenger_age=age, seat_class='AC 3 Tier', berth_preference=berth, status='Confirmed', seat_number=seat_num, fare=fare))
-
-    # Add 10 RAC tickets for the Duronto Express
-    for i in range(10):
-        user_id = test_user_id
-        age = random.randint(18, 70)
-        berth = get_berth_preference(age)
-        rac_num = i + 1
-        fare = calculate_fare('AC 3 Tier')
-        db.session.add(Booking(pnr_number=generate_pnr(), user_id=user_id, train_id=3, passenger_name=f'Passenger D{i+181}', passenger_age=age, seat_class='AC 3 Tier', berth_preference=berth, status='RAC', seat_number=f"RAC-{rac_num}", fare=fare))
-
-    # Add a few bookings to Tejas Express (ID 4) to leave it mostly available
-    db.session.add(Booking(pnr_number=generate_pnr(), user_id=test_user_id, train_id=4, passenger_name='Alice Smith', passenger_age=34, seat_class='AC 1st Class', berth_preference='Upper', status='Confirmed', seat_number=generate_seat_number(1, 'AC 1st Class'), fare=calculate_fare('AC 1st Class')))
-    db.session.add(Booking(pnr_number=generate_pnr(), user_id=admin_id, train_id=4, passenger_name='Bob Johnson', passenger_age=45, seat_class='AC 1st Class', berth_preference='Lower', status='Confirmed', seat_number=generate_seat_number(2, 'AC 1st Class'), fare=calculate_fare('AC 1st Class')))
-    db.session.add(Booking(pnr_number=generate_pnr(), user_id=admin_id, train_id=4, passenger_name='Charlie Brown', passenger_age=65, seat_class='AC 1st Class', berth_preference='Side Lower', status='Confirmed', seat_number=generate_seat_number(3, 'AC 1st Class'), fare=calculate_fare('AC 1st Class')))
+        new_train = Train(
+            id=i, 
+            train_name=random_train_name(), 
+            source=source, 
+            destination=destination, 
+            departure_time=departure_time_str, 
+            arrival_time=arrival_time_str,
+            total_seats=random.randint(20, 30)
+        )
+        all_trains.append(new_train)
     
-    # Add a booking for the return journey train
-    db.session.add(Booking(pnr_number='PNR685037V4P5', user_id=admin_id, train_id=10, passenger_name='rishabh', passenger_age=25, seat_class='AC 2 Tier', berth_preference='Lower', status='Confirmed', seat_number=generate_seat_number(1, 'AC 2 Tier'), fare=calculate_fare('AC 2 Tier')))
-
-
+    db.session.add_all(all_trains)
     db.session.commit()
-    print("-> Realistic bookings added successfully.")
+    print(f"-> Added {num_trains} trains.")
 
-    print("\n✅ Database has been successfully initialized and populated!")
+    # 2.5 Generate Routes for all trains
+    print("Generating routes for all trains...")
+    all_routes = []
+    for train in all_trains:
+        # Generate random number of stops between 2 and 5
+        num_stops = random.randint(2, 5)
+        current_time_dt = datetime.strptime(train.departure_time, '%H:%M')
+        
+        for i in range(num_stops):
+            stop_name = random_city()
+            # Ensure stop is not the source or destination
+            while stop_name == train.source or stop_name == train.destination:
+                stop_name = random_city()
+            
+            # Ensure arrival times are sequential
+            stop_arrival_dt = current_time_dt + timedelta(minutes=random.randint(30, 180))
+            current_time_dt = stop_arrival_dt
+            
+            all_routes.append(Route(train_id=train.id, stop_name=stop_name, arrival_time=stop_arrival_dt.strftime('%H:%M'), stop_order=i+1))
+    
+    db.session.add_all(all_routes)
+    db.session.commit()
+    print("-> All train routes generated.")
+
+    # 3. Add a large number of realistic bookings for all trains
+    print("Adding realistic bookings...")
+    all_bookings = []
+    
+    # Generate all PNRs needed upfront
+    total_bookings = sum(random.randint(1, train.total_seats + 15) for train in all_trains)
+    existing_pnrs = {b.pnr_number for b in Booking.query.all()}
+    
+    pnr_pool = set()
+    while len(pnr_pool) < total_bookings:
+        pnr_pool.add(generate_pnr_unique_in_memory(existing_pnrs.union(pnr_pool)))
+    pnr_list = list(pnr_pool)
+
+    # 20% of trains will be fully booked (with RAC/WL)
+    full_trains = random.sample(all_trains, int(0.2 * num_trains))
+    # 30% of trains will be mostly full (some seats left)
+    busy_trains = random.sample([t for t in all_trains if t not in full_trains], int(0.3 * num_trains))
+    # The rest will have some availability
+    
+    pnr_index = 0
+    for train in all_trains:
+        confirmed_count = 0
+        rac_count = 0
+        waitlist_count = 0
+        
+        if train in full_trains:
+            num_bookings = random.randint(train.total_seats + 5, train.total_seats + 15)
+        elif train in busy_trains:
+            num_bookings = random.randint(train.total_seats - 5, train.total_seats)
+        else:
+            num_bookings = random.randint(1, train.total_seats - 5)
+
+        for i in range(num_bookings):
+            user_id = random.choice([admin_id, test_user_id])
+            age = random.randint(18, 70)
+            berth = get_berth_preference(age)
+            seat_class = random.choice(list(SEATS_PER_COACH.keys()))
+            fare = calculate_fare(seat_class)
+            
+            status = 'Confirmed'
+            seat_number = None
+            if confirmed_count < train.total_seats:
+                status = 'Confirmed'
+                seat_number = generate_seat_number(confirmed_count + 1, seat_class)
+                confirmed_count += 1
+            elif rac_count < 10: # Arbitrary RAC limit of 10
+                status = 'RAC'
+                rac_count += 1
+                seat_number = f"RAC-{rac_count}"
+            else:
+                status = 'Waitlisted'
+                waitlist_count += 1
+                seat_number = f"WL-{waitlist_count}"
+
+            all_bookings.append(Booking(
+                pnr_number=pnr_list[pnr_index], 
+                user_id=user_id, 
+                train_id=train.id, 
+                passenger_name=f'Passenger {train.id}-{i+1}', 
+                passenger_age=age, 
+                seat_class=seat_class, 
+                berth_preference=berth, 
+                status=status, 
+                seat_number=seat_number, 
+                fare=fare
+            ))
+            pnr_index += 1
+
+    db.session.add_all(all_bookings)
+    db.session.commit()
+    print(f"-> Added a total of {len(all_bookings)} bookings.")
+    
+    print("\n✅ Database has been successfully initialized and populated with a large dataset!")
