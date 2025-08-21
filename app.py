@@ -4,12 +4,13 @@ import time
 import random
 import string
 import math
+from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory, send_file
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from fpdf import FPDF
 from sqlalchemy.orm import relationship
-from sqlalchemy import func # NEW: Import func for database functions
+from sqlalchemy import func
 
 # Initialize the Flask app
 app = Flask(__name__)
@@ -44,8 +45,18 @@ class Train(db.Model):
     source = db.Column(db.String(100), nullable=False)
     destination = db.Column(db.String(100), nullable=False)
     departure_time = db.Column(db.String(10), nullable=False) # e.g., '06:15'
+    arrival_time = db.Column(db.String(10), nullable=True)
     total_seats = db.Column(db.Integer, nullable=False)
     bookings = db.relationship('Booking', backref='train', lazy=True)
+    route_stops = db.relationship('Route', backref='train', lazy=True, order_by='Route.stop_order')
+
+class Route(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    train_id = db.Column(db.Integer, db.ForeignKey('train.id'), nullable=False)
+    stop_name = db.Column(db.String(100), nullable=False)
+    arrival_time = db.Column(db.String(10), nullable=False)
+    stop_order = db.Column(db.Integer, nullable=False)
+
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -138,6 +149,25 @@ def generate_seat_number(booking_count, total_seats, seat_class):
 
     return f"{class_initial}{coach_number}-{seat_in_coach}-{berth_abbreviation}"
 
+def calculate_travel_time(departure_time_str, arrival_time_str):
+    """Calculates the travel time between two time strings."""
+    try:
+        departure_time = datetime.strptime(departure_time_str, '%H:%M')
+        arrival_time = datetime.strptime(arrival_time_str, '%H:%M')
+        
+        # Handle overnight journeys
+        if arrival_time < departure_time:
+            arrival_time += timedelta(days=1)
+        
+        travel_duration = arrival_time - departure_time
+        
+        hours = travel_duration.seconds // 3600
+        minutes = (travel_duration.seconds % 3600) // 60
+        
+        return f"{hours}h {minutes}m"
+    except (ValueError, TypeError):
+        return "N/A"
+
 # --- Routes ---
 @app.route('/')
 def index():
@@ -167,6 +197,7 @@ def search():
     for train in trains:
         confirmed_bookings = Booking.query.filter_by(train_id=train.id, status='Confirmed').count()
         train.available_seats = train.total_seats - confirmed_bookings
+        train.travel_time = calculate_travel_time(train.departure_time, train.arrival_time)
         
     return render_template('results.html', trains=trains, source=source, destination=destination)
 
@@ -510,6 +541,31 @@ def add_train():
 
     flash(f'Train "{train_name}" has been added successfully!', 'success')
     return redirect(url_for('admin_dashboard'))
+
+@app.route('/train_route/<int:train_id>')
+def train_route(train_id):
+    train = Train.query.get_or_404(train_id)
+    return render_template('train_route.html', train=train)
+
+@app.route('/book_return/<pnr>')
+def book_return(pnr):
+    if not session.get('logged_in'):
+        flash('You must be logged in to book a ticket.', 'danger')
+        return redirect(url_for('login'))
+        
+    booking = Booking.query.filter_by(pnr_number=pnr).first_or_404()
+    original_train = booking.train
+    
+    # Find a train that runs the reverse route
+    return_train = Train.query.filter_by(source=original_train.destination, destination=original_train.source).first()
+    
+    if return_train:
+        flash('Found a train for your return journey.', 'info')
+        return redirect(url_for('book', train_id=return_train.id))
+    else:
+        flash('Sorry, no return journey trains were found for this route.', 'danger')
+        return redirect(url_for('booking_confirmation', pnr=pnr))
+
 
 if __name__ == '__main__':
     with app.app_context():

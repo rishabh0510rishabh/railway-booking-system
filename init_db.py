@@ -3,7 +3,7 @@ import random
 import time
 import string
 import math
-from app import app, db, Train, User, Booking, generate_pnr, Passenger
+from app import app, db, Train, User, Booking, generate_pnr, Passenger, Route
 
 # --- Configuration ---
 DB_FILE = 'railway.db'
@@ -91,20 +91,46 @@ with app.app_context():
     # 2. Add Trains
     print("Adding train data...")
     train_data = [
-        {'name': 'Shatabdi Express', 'source': 'New Delhi', 'dest': 'Lucknow', 'time': '06:15', 'seats': 150},
-        {'name': 'Rajdhani Express', 'source': 'Mumbai', 'dest': 'New Delhi', 'time': '17:00', 'seats': 200},
-        {'name': 'Duronto Express', 'source': 'Kolkata', 'dest': 'Pune', 'time': '05:45', 'seats': 180},
-        {'name': 'Tejas Express', 'source': 'Chennai', 'dest': 'Madurai', 'time': '06:00', 'seats': 120},
-        {'name': 'Gatimaan Express', 'source': 'Delhi', 'dest': 'Agra', 'time': '08:10', 'seats': 100},
-        {'name': 'Deccan Queen', 'source': 'Mumbai', 'dest': 'Pune', 'time': '17:10', 'seats': 160},
-        {'name': 'Goa Express', 'source': 'Vasco da Gama', 'dest': 'Delhi', 'time': '15:00', 'seats': 190},
-        {'name': 'Punjab Mail', 'source': 'Mumbai', 'dest': 'Firozpur', 'time': '19:35', 'seats': 260},
-        {'name': 'Bihar Sampark Kranti Exp', 'source': 'New Delhi', 'dest': 'Darbhanga', 'time': '07:40', 'seats': 130},
+        {'id': 1, 'name': 'Shatabdi Express', 'source': 'New Delhi', 'dest': 'Lucknow', 'time': '06:15', 'arrival': '13:00', 'seats': 150},
+        {'id': 2, 'name': 'Rajdhani Express', 'source': 'Mumbai', 'dest': 'New Delhi', 'time': '17:00', 'arrival': '10:00', 'seats': 200},
+        {'id': 3, 'name': 'Duronto Express', 'source': 'Kolkata', 'dest': 'Pune', 'time': '05:45', 'arrival': '02:30', 'seats': 180},
+        {'id': 4, 'name': 'Tejas Express', 'source': 'Chennai', 'dest': 'Madurai', 'time': '06:00', 'arrival': '12:45', 'seats': 120},
+        {'id': 5, 'name': 'Gatimaan Express', 'source': 'Delhi', 'dest': 'Agra', 'time': '08:10', 'arrival': '10:00', 'seats': 100},
+        {'id': 6, 'name': 'Deccan Queen', 'source': 'Mumbai', 'dest': 'Pune', 'time': '17:10', 'arrival': '21:30', 'seats': 160},
+        {'id': 7, 'name': 'Goa Express', 'source': 'Vasco da Gama', 'dest': 'Delhi', 'time': '15:00', 'arrival': '09:00', 'seats': 190},
+        {'id': 8, 'name': 'Punjab Mail', 'source': 'Mumbai', 'dest': 'Firozpur', 'time': '19:35', 'arrival': '05:00', 'seats': 260},
+        {'id': 9, 'name': 'Bihar Sampark Kranti Exp', 'source': 'New Delhi', 'dest': 'Darbhanga', 'time': '07:40', 'arrival': '05:00', 'seats': 130},
+        # Add a return journey for one of the trains for testing
+        {'id': 10, 'name': 'Rajdhani Express (Return)', 'source': 'New Delhi', 'dest': 'Mumbai', 'time': '17:00', 'arrival': '10:00', 'seats': 200}
     ]
     for train_info in train_data:
-        db.session.add(Train(train_name=train_info['name'], source=train_info['source'], destination=train_info['dest'], departure_time=train_info['time'], total_seats=train_info['seats']))
+        db.session.add(Train(id=train_info['id'], train_name=train_info['name'], source=train_info['source'], destination=train_info['dest'], departure_time=train_info['time'], arrival_time=train_info['arrival'], total_seats=train_info['seats']))
     db.session.commit()
     print(f"-> Added {len(train_data)} trains.")
+
+    # 2.5 Add Routes (Stops)
+    print("Adding route stops...")
+    route_data = [
+        # Shatabdi Express
+        {'train_id': 1, 'stop_name': 'Ghaziabad', 'arrival_time': '06:55', 'order': 1},
+        {'train_id': 1, 'stop_name': 'Moradabad', 'arrival_time': '09:00', 'order': 2},
+        {'train_id': 1, 'stop_name': 'Bareilly', 'arrival_time': '10:15', 'order': 3},
+        
+        # Rajdhani Express
+        {'train_id': 2, 'stop_name': 'Vadodara', 'arrival_time': '21:50', 'order': 1},
+        {'train_id': 2, 'stop_name': 'Kota', 'arrival_time': '03:45', 'order': 2},
+        {'train_id': 2, 'stop_name': 'New Delhi', 'arrival_time': '10:00', 'order': 3},
+
+        # Rajdhani Express (Return)
+        {'train_id': 10, 'stop_name': 'Kota', 'arrival_time': '23:45', 'order': 1},
+        {'train_id': 10, 'stop_name': 'Vadodara', 'arrival_time': '05:50', 'order': 2},
+        {'train_id': 10, 'stop_name': 'Mumbai', 'arrival_time': '10:00', 'order': 3}
+    ]
+    for route_info in route_data:
+        db.session.add(Route(train_id=route_info['train_id'], stop_name=route_info['stop_name'], arrival_time=route_info['arrival_time'], stop_order=route_info['order']))
+    db.session.commit()
+    print(f"-> Added {len(route_data)} route stops.")
+
 
     # 3. Add a large number of realistic bookings
     print("Adding realistic bookings...")
@@ -163,6 +189,10 @@ with app.app_context():
     db.session.add(Booking(pnr_number=generate_pnr(), user_id=test_user_id, train_id=4, passenger_name='Alice Smith', passenger_age=34, seat_class='AC 1st Class', berth_preference='Upper', status='Confirmed', seat_number=generate_seat_number(1, 'AC 1st Class'), fare=calculate_fare('AC 1st Class')))
     db.session.add(Booking(pnr_number=generate_pnr(), user_id=admin_id, train_id=4, passenger_name='Bob Johnson', passenger_age=45, seat_class='AC 1st Class', berth_preference='Lower', status='Confirmed', seat_number=generate_seat_number(2, 'AC 1st Class'), fare=calculate_fare('AC 1st Class')))
     db.session.add(Booking(pnr_number=generate_pnr(), user_id=admin_id, train_id=4, passenger_name='Charlie Brown', passenger_age=65, seat_class='AC 1st Class', berth_preference='Side Lower', status='Confirmed', seat_number=generate_seat_number(3, 'AC 1st Class'), fare=calculate_fare('AC 1st Class')))
+    
+    # Add a booking for the return journey train
+    db.session.add(Booking(pnr_number='PNR685037V4P5', user_id=admin_id, train_id=10, passenger_name='rishabh', passenger_age=25, seat_class='AC 2 Tier', berth_preference='Lower', status='Confirmed', seat_number=generate_seat_number(1, 'AC 2 Tier'), fare=calculate_fare('AC 2 Tier')))
+
 
     db.session.commit()
     print("-> Realistic bookings added successfully.")

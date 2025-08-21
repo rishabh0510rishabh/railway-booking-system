@@ -24,5 +24,6 @@
     </div>
   </div>
 
+  <a href="{{ url_for('book_return', pnr=booking.pnr_number) }}" class="btn btn-primary mt-3">Book Return Journey</a>
   <a href="/" class="btn btn-secondary mt-3">Book Another Ticket</a>
 {% endblock %}
