@@ -9,6 +9,7 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from fpdf import FPDF
 from sqlalchemy.orm import relationship
+from sqlalchemy import func # NEW: Import func for database functions
 
 # Initialize the Flask app
 app = Flask(__name__)
@@ -148,7 +149,11 @@ def search():
     destination = request.form['destination']
     time_filter = request.form['time_filter']
 
-    query = Train.query.filter_by(source=source, destination=destination)
+    # FIX: Use a case-insensitive search with func.lower()
+    query = Train.query.filter(
+        func.lower(Train.source) == func.lower(source),
+        func.lower(Train.destination) == func.lower(destination)
+    )
 
     if time_filter == 'morning':
         query = query.filter(Train.departure_time >= '05:00', Train.departure_time < '12:00')
