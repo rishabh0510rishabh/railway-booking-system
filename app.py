@@ -4,6 +4,9 @@ import time
 import random
 import string
 import math
+import qrcode
+import base64
+from io import BytesIO
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory, send_file
 from flask_sqlalchemy import SQLAlchemy
@@ -168,6 +171,23 @@ def calculate_travel_time(departure_time_str, arrival_time_str):
     except (ValueError, TypeError):
         return "N/A"
 
+def generate_qr_code(data):
+    """Generates a QR code and returns it as a base64 encoded string."""
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(data)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    buf = BytesIO()
+    img.save(buf)
+    return base64.b64encode(buf.getvalue()).decode('ascii')
+
+
 # --- Routes ---
 @app.route('/')
 def index():
@@ -327,35 +347,86 @@ def pnr_status():
 def download_ticket(pnr):
     booking = Booking.query.filter_by(pnr_number=pnr).first_or_404()
 
-    pdf = FPDF()
+    pdf = FPDF(unit="mm", format="A4")
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, "E-Ticket", 1, 1, 'C')
-
-    pdf.set_font("Helvetica", "", 12)
-    pdf.cell(0, 10, f"PNR Number: {booking.pnr_number}", 0, 1)
-    pdf.cell(0, 10, f"Passenger: {booking.passenger_name}, Age: {booking.passenger_age}", 0, 1)
+    pdf.set_auto_page_break(auto=True, margin=15)
     
-    # Display Berth/Seat details based on status
-    if booking.status == 'Confirmed' or booking.status == 'RAC':
-        pdf.cell(0, 10, f"Berth/Seat: {booking.seat_number}", 0, 1)
-    else:
-        pdf.cell(0, 10, f"Status: {booking.status}", 0, 1)
+    # QR Code
+    qr_data = f"PNR: {booking.pnr_number}, Passenger: {booking.passenger_name}, Status: {booking.status}"
+    qr_base64 = generate_qr_code(qr_data)
+    
+    # Title
+    pdf.set_font("Helvetica", "B", 24)
+    pdf.cell(0, 15, "Indian Railways E-Ticket", 0, 1, 'C')
+    pdf.ln(5)
+    
+    # Ticket box
+    pdf.set_draw_color(100, 100, 100)
+    pdf.rect(10, 35, 190, 120)
 
-    pdf.cell(0, 10, f"Seat Class: {booking.seat_class}", 0, 1) 
-    pdf.cell(0, 10, f"Fare Paid: ${booking.fare:.2f}", 0, 1)
-    pdf.cell(0, 10, f"Train: {booking.train.train_name}", 0, 1)
-    pdf.cell(0, 10, f"Route: {booking.train.source} to {booking.train.destination}", 0, 1)
-    pdf.cell(0, 10, f"Departure Time: {booking.train.departure_time}", 0, 1)
+    pdf.image(f"data:image/png;base64,{qr_base64}", x=160, y=40, w=30)
+    
+    # PNR and Status
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_xy(15, 45)
+    pdf.cell(0, 8, f"PNR Number: {booking.pnr_number}", 0, 1, 'L')
+    pdf.set_xy(15, 55)
+    pdf.cell(0, 8, f"Status: {booking.status}", 0, 1, 'L')
+    
+    # Passenger Details
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_xy(15, 70)
+    pdf.cell(0, 8, "Passenger Details", 0, 1, 'L')
+    pdf.set_font("Helvetica", "", 12)
+    pdf.set_xy(15, 78)
+    pdf.cell(0, 8, f"Name: {booking.passenger_name}", 0, 1, 'L')
+    pdf.set_xy(15, 86)
+    pdf.cell(0, 8, f"Age: {booking.passenger_age}", 0, 1, 'L')
 
+    # Journey Details
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_xy(15, 100)
+    pdf.cell(0, 8, "Journey Details", 0, 1, 'L')
+    pdf.set_font("Helvetica", "", 12)
+    pdf.set_xy(15, 108)
+    pdf.cell(0, 8, f"Train: {booking.train.train_name} ({booking.train.source} -> {booking.train.destination})", 0, 1, 'L')
+    pdf.set_xy(15, 116)
+    pdf.cell(0, 8, f"Departure: {booking.train.departure_time}", 0, 1, 'L')
+    pdf.set_xy(15, 124)
+    pdf.cell(0, 8, f"Class: {booking.seat_class}", 0, 1, 'L')
+    if booking.seat_number:
+        pdf.set_xy(15, 132)
+        pdf.cell(0, 8, f"Berth/Seat: {booking.seat_number}", 0, 1, 'L')
+
+    # Fare Details
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_xy(15, 146)
+    pdf.cell(0, 8, "Fare Details", 0, 1, 'L')
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_text_color(25, 135, 84) # Success color
+    pdf.set_xy(15, 154)
+    pdf.cell(0, 8, f"Total Fare: ${booking.fare:.2f}", 0, 1, 'L')
+    
     # Define the filename for the temporary PDF
     pdf_filename = f"ticket_{pnr}.pdf"
-
+    
     # Save the PDF to a file on the server
     pdf.output(pdf_filename)
 
     # Send the file to the user for download
     return send_file(pdf_filename, as_attachment=True)
+
+
+@app.route('/print_ticket/<pnr>')
+def print_ticket(pnr):
+    booking = Booking.query.filter_by(pnr_number=pnr).first_or_404()
+    
+    # Generate QR code data
+    qr_data = f"PNR: {booking.pnr_number}, Passenger: {booking.passenger_name}, Status: {booking.status}"
+    qr_base64 = generate_qr_code(qr_data)
+    
+    return render_template('print_ticket.html', booking=booking, qr_code=qr_base64)
+
 
 @app.route('/signup', methods=['POST'])
 def signup():
@@ -566,10 +637,6 @@ def book_return(pnr):
         flash('Sorry, no return journey trains were found for this route.', 'danger')
         return redirect(url_for('booking_confirmation', pnr=pnr))
 
-@app.route('/print_ticket/<pnr>')
-def print_ticket(pnr):
-    booking = Booking.query.filter_by(pnr_number=pnr).first_or_404()
-    return render_template('print_ticket.html', booking=booking)
 
 if __name__ == '__main__':
     with app.app_context():
