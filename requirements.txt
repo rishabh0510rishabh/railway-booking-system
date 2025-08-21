@@ -4,3 +4,4 @@ werkzeug
 fpdf
 qrcode
 Pillow
+gunicorn
