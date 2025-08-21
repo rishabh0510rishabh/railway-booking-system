@@ -4,7 +4,10 @@
   <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
       <h4>Ticket Details</h4>
-      <a href="{{ url_for('download_ticket', pnr=booking.pnr_number) }}" class="btn btn-success">Download PDF</a>
+      <div>
+        <a href="{{ url_for('print_ticket', pnr=booking.pnr_number) }}" class="btn btn-sm btn-info" target="_blank">Print</a>
+        <a href="{{ url_for('download_ticket', pnr=booking.pnr_number) }}" class="btn btn-sm btn-success">Download PDF</a>
+      </div>
     </div>
     <div class="card-body">
       <p><strong>PNR Number:</strong> {{ booking.pnr_number }}</p>

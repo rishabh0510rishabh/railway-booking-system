@@ -566,6 +566,10 @@ def book_return(pnr):
         flash('Sorry, no return journey trains were found for this route.', 'danger')
         return redirect(url_for('booking_confirmation', pnr=pnr))
 
+@app.route('/print_ticket/<pnr>')
+def print_ticket(pnr):
+    booking = Booking.query.filter_by(pnr_number=pnr).first_or_404()
+    return render_template('print_ticket.html', booking=booking)
 
 if __name__ == '__main__':
     with app.app_context():

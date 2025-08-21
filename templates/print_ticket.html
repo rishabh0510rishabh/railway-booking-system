@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Print Ticket</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f8f9fa;
+      font-family: 'Inter', sans-serif;
+      padding: 2rem;
+    }
+    .ticket-container {
+      background-color: #ffffff;
+      border: 1px solid #dee2e6;
+      border-radius: 1rem;
+      padding: 2.5rem;
+      max-width: 800px;
+      margin: auto;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+    .ticket-header {
+      text-align: center;
+      margin-bottom: 2rem;
+      border-bottom: 2px solid #000;
+      padding-bottom: 1rem;
+    }
+    .ticket-header h1 {
+      font-weight: 700;
+      color: #343a40;
+    }
+    .ticket-header h5 {
+      color: #6c757d;
+      margin-top: 0.5rem;
+    }
+    .ticket-section {
+      border: 1px solid #e9ecef;
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .section-title {
+      font-weight: 600;
+      font-size: 1.1rem;
+      color: #495057;
+      margin-bottom: 1rem;
+    }
+    .details-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+    .details-row strong {
+      color: #212529;
+    }
+    .details-row span {
+      color: #495057;
+      text-align: right;
+    }
+    .badge-status {
+      padding: 0.4em 0.8em;
+      border-radius: 0.5rem;
+      font-weight: bold;
+    }
+    .badge-confirmed {
+      background-color: #198754;
+      color: #fff;
+    }
+    .badge-rac {
+      background-color: #ffc107;
+      color: #000;
+    }
+    .badge-waitlisted {
+      background-color: #0dcaf0;
+      color: #fff;
+    }
+    .fare-box {
+      text-align: center;
+      padding: 1rem;
+      background-color: #e9f5ee;
+      border: 1px solid #c3e6cb;
+      border-radius: 0.5rem;
+    }
+    .fare-box h4 {
+      margin-bottom: 0;
+      font-weight: 700;
+      color: #155724;
+    }
+    .fare-box .text-success {
+      font-size: 1.5rem;
+    }
+    .qr-code {
+      width: 120px;
+      height: 120px;
+      background-color: #e9ecef;
+      border-radius: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+    .qr-code img {
+        width: 100%;
+        height: 100%;
+    }
+    @media print {
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #fff;
+      }
+      .ticket-container {
+        border: none;
+        box-shadow: none;
+        max-width: none;
+        padding: 0;
+        border-radius: 0;
+      }
+      .d-print-none {
+        display: none !important;
+      }
+      .page-break {
+        page-break-after: always;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="ticket-container">
+    <div class="ticket-header">
+      <h1>Indian Railways E-Ticket</h1>
+      <h5>Your journey, simplified.</h5>
+    </div>
+    
+    <div class="row">
+      <!-- Left Column -->
+      <div class="col-md-7">
+        <div class="ticket-section">
+          <div class="section-title">Passenger Details</div>
+          <div class="details-row">
+            <strong>PNR Number:</strong>
+            <span>{{ booking.pnr_number }}</span>
+          </div>
+          <div class="details-row">
+            <strong>Status:</strong>
+            <span>
+              <span class="badge-status
+              {% if booking.status == 'Confirmed' %}
+                badge-confirmed
+              {% elif booking.status == 'RAC' %}
+                badge-rac
+              {% else %}
+                badge-waitlisted
+              {% endif %}
+              ">{{ booking.status }}</span>
+            </span>
+          </div>
+          <div class="details-row">
+            <strong>Name:</strong>
+            <span>{{ booking.passenger_name }}</span>
+          </div>
+          <div class="details-row">
+            <strong>Age:</strong>
+            <span>{{ booking.passenger_age }} years</span>
+          </div>
+        </div>
+
+        <div class="ticket-section">
+          <div class="section-title">Journey Details</div>
+          <div class="details-row">
+            <strong>Train Name:</strong>
+            <span>{{ booking.train.train_name }}</span>
+          </div>
+          <div class="details-row">
+            <strong>Route:</strong>
+            <span>{{ booking.train.source }} &rarr; {{ booking.train.destination }}</span>
+          </div>
+          <div class="details-row">
+            <strong>Departure:</strong>
+            <span>{{ booking.train.departure_time }}</span>
+          </div>
+          <div class="details-row">
+            <strong>Class:</strong>
+            <span>{{ booking.seat_class }}</span>
+          </div>
+          <div class="details-row">
+            <strong>Berth/Seat:</strong>
+            <span>{{ booking.seat_number or 'N/A' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column -->
+      <div class="col-md-5 d-flex flex-column align-items-center">
+        <div class="qr-code">
+          <img src="https://placehold.co/120x120?text=QR+Code" alt="QR Code" class="img-fluid">
+        </div>
+        <div class="fare-box w-100 mt-3">
+          <h4 class="mb-2">Total Fare</h4>
+          <span class="fw-bold text-success">${{ booking.fare|round(2) }}</span>
+        </div>
+      </div>
+    </div>
+    
+    <p class="text-center text-muted mt-4 pt-4 border-top">
+      Generated by Ticket Generating System | &copy; 2025
+    </p>
+
+  </div>
+
+  <script>
+    window.onload = function() {
+      window.print();
+    }
+  </script>
+</body>
+</html>
