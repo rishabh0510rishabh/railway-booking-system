@@ -612,6 +612,12 @@ def add_train():
 
     flash(f'Train "{train_name}" has been added successfully!', 'success')
     return redirect(url_for('admin_dashboard'))
+    
+@app.route('/train_route_check')
+def train_route_check():
+    train_id = request.args.get('train_id')
+    return redirect(url_for('train_route', train_id=train_id))
+
 
 @app.route('/train_route/<int:train_id>')
 def train_route(train_id):
