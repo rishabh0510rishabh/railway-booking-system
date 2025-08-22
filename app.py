@@ -451,22 +451,24 @@ def signup():
     flash('Account created successfully! Please log in.', 'success')
     return redirect(url_for('index'))
 
-@app.route('/login', methods=['POST'])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
-    username = request.form['username']
-    password = request.form['password']
-    user = User.query.filter_by(username=username).first()
-    
-    if user and user.check_password(password):
-        session['logged_in'] = True
-        session['user_id'] = user.id
-        session['username'] = user.username
-        session['is_admin'] = (user.role == 'admin')
-        flash(f'Welcome back, {user.username}!', 'success')
-    else:
-        flash('Invalid username or password.', 'danger')
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        user = User.query.filter_by(username=username).first()
         
-    return redirect(url_for('index'))
+        if user and user.check_password(password):
+            session['logged_in'] = True
+            session['user_id'] = user.id
+            session['username'] = user.username
+            session['is_admin'] = (user.role == 'admin')
+            flash(f'Welcome back, {user.username}!', 'success')
+        else:
+            flash('Invalid username or password.', 'danger')
+            
+        return redirect(url_for('index'))
+    return render_template('login.html')
 
 @app.route('/admin/dashboard')
 def admin_dashboard():
