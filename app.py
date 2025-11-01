@@ -223,8 +223,24 @@ def search():
     
     trains = query.all()
     
+    # Optimize: Calculate available seats for all trains in a single query
+    train_ids = [train.id for train in trains]
+    if train_ids:
+        confirmed_counts = db.session.query(
+            Booking.train_id, 
+            func.count(Booking.id)
+        ).filter(
+            Booking.train_id.in_(train_ids),
+            Booking.status == 'Confirmed'
+        ).group_by(Booking.train_id).all()
+        
+        # Convert to dictionary for O(1) lookups
+        confirmed_dict = dict(confirmed_counts)
+    else:
+        confirmed_dict = {}
+    
     for train in trains:
-        confirmed_bookings = Booking.query.filter_by(train_id=train.id, status='Confirmed').count()
+        confirmed_bookings = confirmed_dict.get(train.id, 0)
         train.available_seats = train.total_seats - confirmed_bookings
         train.travel_time = calculate_travel_time(train.departure_time, train.arrival_time)
         
@@ -298,10 +314,14 @@ def submit_booking():
     # Fetch train details
     train_to_book = Train.query.get_or_404(train_id)
     
-    # Calculate current booking counts for this train
-    confirmed_bookings = Booking.query.filter_by(train_id=train_id, status='Confirmed').count()
-    rac_bookings = Booking.query.filter_by(train_id=train_id, status='RAC').count()
-    waitlisted_bookings = Booking.query.filter_by(train_id=train_id, status='Waitlisted').count()
+    try:
+        # Calculate current booking counts for this train
+        confirmed_bookings = Booking.query.filter_by(train_id=train_id, status='Confirmed').count()
+        rac_bookings = Booking.query.filter_by(train_id=train_id, status='RAC').count()
+        waitlisted_bookings = Booking.query.filter_by(train_id=train_id, status='Waitlisted').count()
+    except Exception as e:
+        flash('An error occurred while processing your booking. Please try again.', 'danger')
+        return redirect(url_for('index'))
 
     # Determine the status and seat number of the new booking
     status = 'Confirmed'
@@ -338,20 +358,25 @@ def submit_booking():
         fare=fare
     )
     
-    db.session.add(new_booking)
+    try:
+        db.session.add(new_booking)
 
-    if save_passenger:
-        existing_passenger = Passenger.query.filter_by(user_id=session['user_id'], name=passenger_name, age=passenger_age).first()
-        if not existing_passenger:
-            new_passenger = Passenger(
-                user_id=session['user_id'],
-                name=passenger_name,
-                age=passenger_age,
-                berth_preference=requested_berth
-            )
-            db.session.add(new_passenger)
-    
-    db.session.commit()
+        if save_passenger:
+            existing_passenger = Passenger.query.filter_by(user_id=session['user_id'], name=passenger_name, age=passenger_age).first()
+            if not existing_passenger:
+                new_passenger = Passenger(
+                    user_id=session['user_id'],
+                    name=passenger_name,
+                    age=passenger_age,
+                    berth_preference=requested_berth
+                )
+                db.session.add(new_passenger)
+        
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        flash('An error occurred while booking your ticket. Please try again.', 'danger')
+        return redirect(url_for('index'))
     
     return redirect(url_for('booking_confirmation', pnr=new_booking.pnr_number))
 
@@ -383,74 +408,78 @@ def pnr_status():
 def download_ticket(pnr):
     booking = Booking.query.filter_by(pnr_number=pnr).first_or_404()
 
-    pdf = FPDF(unit="mm", format="A4")
-    pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    
-    # QR Code
-    qr_data = f"PNR: {booking.pnr_number}, Passenger: {booking.passenger_name}, Status: {booking.status}"
-    qr_base64 = generate_qr_code(qr_data)
-    
-    # Title
-    pdf.set_font("Helvetica", "B", 24)
-    pdf.cell(0, 15, "Indian Railways E-Ticket", 0, 1, 'C')
-    pdf.ln(5)
-    
-    # Ticket box
-    pdf.set_draw_color(100, 100, 100)
-    pdf.rect(10, 35, 190, 120)
+    try:
+        pdf = FPDF(unit="mm", format="A4")
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        
+        # QR Code
+        qr_data = f"PNR: {booking.pnr_number}, Passenger: {booking.passenger_name}, Status: {booking.status}"
+        qr_base64 = generate_qr_code(qr_data)
+        
+        # Title
+        pdf.set_font("Helvetica", "B", 24)
+        pdf.cell(0, 15, "Indian Railways E-Ticket", 0, 1, 'C')
+        pdf.ln(5)
+        
+        # Ticket box
+        pdf.set_draw_color(100, 100, 100)
+        pdf.rect(10, 35, 190, 120)
 
-    pdf.image(f"data:image/png;base64,{qr_base64}", x=160, y=40, w=30)
-    
-    # PNR and Status
-    pdf.set_font("Helvetica", "B", 14)
-    pdf.set_xy(15, 45)
-    pdf.cell(0, 8, f"PNR Number: {booking.pnr_number}", 0, 1, 'L')
-    pdf.set_xy(15, 55)
-    pdf.cell(0, 8, f"Status: {booking.status}", 0, 1, 'L')
-    
-    # Passenger Details
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_xy(15, 70)
-    pdf.cell(0, 8, "Passenger Details", 0, 1, 'L')
-    pdf.set_font("Helvetica", "", 12)
-    pdf.set_xy(15, 78)
-    pdf.cell(0, 8, f"Name: {booking.passenger_name}", 0, 1, 'L')
-    pdf.set_xy(15, 86)
-    pdf.cell(0, 8, f"Age: {booking.passenger_age}", 0, 1, 'L')
+        pdf.image(f"data:image/png;base64,{qr_base64}", x=160, y=40, w=30)
+        
+        # PNR and Status
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.set_xy(15, 45)
+        pdf.cell(0, 8, f"PNR Number: {booking.pnr_number}", 0, 1, 'L')
+        pdf.set_xy(15, 55)
+        pdf.cell(0, 8, f"Status: {booking.status}", 0, 1, 'L')
+        
+        # Passenger Details
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_xy(15, 70)
+        pdf.cell(0, 8, "Passenger Details", 0, 1, 'L')
+        pdf.set_font("Helvetica", "", 12)
+        pdf.set_xy(15, 78)
+        pdf.cell(0, 8, f"Name: {booking.passenger_name}", 0, 1, 'L')
+        pdf.set_xy(15, 86)
+        pdf.cell(0, 8, f"Age: {booking.passenger_age}", 0, 1, 'L')
 
-    # Journey Details
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_xy(15, 100)
-    pdf.cell(0, 8, "Journey Details", 0, 1, 'L')
-    pdf.set_font("Helvetica", "", 12)
-    pdf.set_xy(15, 108)
-    pdf.cell(0, 8, f"Train: {booking.train.train_name} ({booking.train.source} -> {booking.train.destination})", 0, 1, 'L')
-    pdf.set_xy(15, 116)
-    pdf.cell(0, 8, f"Departure: {booking.train.departure_time}", 0, 1, 'L')
-    pdf.set_xy(15, 124)
-    pdf.cell(0, 8, f"Class: {booking.seat_class}", 0, 1, 'L')
-    if booking.seat_number:
-        pdf.set_xy(15, 132)
-        pdf.cell(0, 8, f"Berth/Seat: {booking.seat_number}", 0, 1, 'L')
+        # Journey Details
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_xy(15, 100)
+        pdf.cell(0, 8, "Journey Details", 0, 1, 'L')
+        pdf.set_font("Helvetica", "", 12)
+        pdf.set_xy(15, 108)
+        pdf.cell(0, 8, f"Train: {booking.train.train_name} ({booking.train.source} -> {booking.train.destination})", 0, 1, 'L')
+        pdf.set_xy(15, 116)
+        pdf.cell(0, 8, f"Departure: {booking.train.departure_time}", 0, 1, 'L')
+        pdf.set_xy(15, 124)
+        pdf.cell(0, 8, f"Class: {booking.seat_class}", 0, 1, 'L')
+        if booking.seat_number:
+            pdf.set_xy(15, 132)
+            pdf.cell(0, 8, f"Berth/Seat: {booking.seat_number}", 0, 1, 'L')
 
-    # Fare Details
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_xy(15, 146)
-    pdf.cell(0, 8, "Fare Details", 0, 1, 'L')
-    pdf.set_font("Helvetica", "B", 14)
-    pdf.set_text_color(25, 135, 84) # Success color
-    pdf.set_xy(15, 154)
-    pdf.cell(0, 8, f"Total Fare: ${booking.fare:.2f}", 0, 1, 'L')
-    
-    # Define the filename for the temporary PDF
-    pdf_filename = f"ticket_{pnr}.pdf"
-    
-    # Save the PDF to a file on the server
-    pdf.output(pdf_filename)
+        # Fare Details
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_xy(15, 146)
+        pdf.cell(0, 8, "Fare Details", 0, 1, 'L')
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.set_text_color(25, 135, 84) # Success color
+        pdf.set_xy(15, 154)
+        pdf.cell(0, 8, f"Total Fare: ${booking.fare:.2f}", 0, 1, 'L')
+        
+        # Define the filename for the temporary PDF
+        pdf_filename = f"ticket_{pnr}.pdf"
+        
+        # Save the PDF to a file on the server
+        pdf.output(pdf_filename)
 
-    # Send the file to the user for download
-    return send_file(pdf_filename, as_attachment=True)
+        # Send the file to the user for download
+        return send_file(pdf_filename, as_attachment=True)
+    except Exception as e:
+        flash('An error occurred while generating the PDF ticket.', 'danger')
+        return redirect(url_for('booking_confirmation', pnr=pnr))
 
 
 @app.route('/print_ticket/<pnr>')
@@ -491,13 +520,17 @@ def signup():
     if email and User.query.filter_by(email=email).first():
         flash('Email address is already registered.', 'danger')
         return redirect(url_for('index'))
-        
-    new_user = User(username=username, email=email, phone_number=phone)
-    new_user.set_password(password)
-    db.session.add(new_user)
-    db.session.commit()
     
-    flash('Account created successfully! Please log in.', 'success')
+    try:
+        new_user = User(username=username, email=email, phone_number=phone)
+        new_user.set_password(password)
+        db.session.add(new_user)
+        db.session.commit()
+        flash('Account created successfully! Please log in.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('An error occurred while creating your account. Please try again.', 'danger')
+    
     return redirect(url_for('index'))
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -592,18 +625,26 @@ def profile():
                 flash('Passenger name is too long.', 'danger')
                 return redirect(url_for('profile'))
             
-            new_passenger = Passenger(user_id=user_id, name=name, age=age, berth_preference=berth_preference)
-            db.session.add(new_passenger)
-            db.session.commit()
-            flash(f'Passenger "{name}" added successfully!', 'success')
+            try:
+                new_passenger = Passenger(user_id=user_id, name=name, age=age, berth_preference=berth_preference)
+                db.session.add(new_passenger)
+                db.session.commit()
+                flash(f'Passenger "{name}" added successfully!', 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash('An error occurred while adding the passenger.', 'danger')
             return redirect(url_for('profile'))
         
         elif action == 'delete_passenger':
             passenger_id = request.args.get('passenger_id')
-            passenger_to_delete = Passenger.query.filter_by(id=passenger_id, user_id=user_id).first_or_404()
-            db.session.delete(passenger_to_delete)
-            db.session.commit()
-            flash('Saved passenger removed.', 'info')
+            try:
+                passenger_to_delete = Passenger.query.filter_by(id=passenger_id, user_id=user_id).first_or_404()
+                db.session.delete(passenger_to_delete)
+                db.session.commit()
+                flash('Saved passenger removed.', 'info')
+            except Exception as e:
+                db.session.rollback()
+                flash('An error occurred while removing the passenger.', 'danger')
             return redirect(url_for('profile'))
         
         else: # Handle standard profile updates
@@ -624,13 +665,17 @@ def profile():
                 flash('This username is already taken. Please choose a different one.', 'danger')
                 return redirect(url_for('profile'))
 
-            user.username = new_username
-            user.email = new_email
-            user.phone_number = new_phone
-            
-            db.session.commit()
-            session['username'] = user.username
-            flash('Profile updated successfully!', 'success')
+            try:
+                user.username = new_username
+                user.email = new_email
+                user.phone_number = new_phone
+                
+                db.session.commit()
+                session['username'] = user.username
+                flash('Profile updated successfully!', 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash('An error occurred while updating your profile.', 'danger')
             return redirect(url_for('profile'))
     
     recent_bookings = Booking.query.filter_by(user_id=user_id).order_by(Booking.id.desc()).limit(5).all()
@@ -663,9 +708,13 @@ def change_password():
     elif new_password != confirm_password:
         flash('New password and confirmation do not match.', 'danger')
     else:
-        user.set_password(new_password)
-        db.session.commit()
-        flash('Password updated successfully!', 'success')
+        try:
+            user.set_password(new_password)
+            db.session.commit()
+            flash('Password updated successfully!', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while updating your password.', 'danger')
 
     return redirect(url_for('profile'))
 
@@ -717,17 +766,21 @@ def add_train():
         flash('Train name or station names are too long.', 'danger')
         return redirect(url_for('admin_dashboard'))
 
-    new_train = Train(
-        train_name=train_name,
-        source=source,
-        destination=destination,
-        departure_time=departure_time,
-        total_seats=total_seats
-    )
-    db.session.add(new_train)
-    db.session.commit()
-
-    flash(f'Train "{train_name}" has been added successfully!', 'success')
+    try:
+        new_train = Train(
+            train_name=train_name,
+            source=source,
+            destination=destination,
+            departure_time=departure_time,
+            total_seats=total_seats
+        )
+        db.session.add(new_train)
+        db.session.commit()
+        flash(f'Train "{train_name}" has been added successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('An error occurred while adding the train. Please try again.', 'danger')
+    
     return redirect(url_for('admin_dashboard'))
     
 @app.route('/train_route_check')
