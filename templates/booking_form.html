@@ -23,12 +23,15 @@
 
     <div class="mb-3">
       <label for="passenger_name" class="form-label">Passenger Name:</label>
-      <input type="text" class="form-control" id="passenger_name" name="passenger_name" required>
+      <input type="text" class="form-control" id="passenger_name" name="passenger_name" 
+             required aria-required="true" maxlength="100" 
+             title="Please enter a valid name">
     </div>
     
     <div class="mb-3">
       <label for="passenger_age" class="form-label">Age:</label>
-      <input type="number" class="form-control" id="passenger_age" name="passenger_age" min="1" required>
+      <input type="number" class="form-control" id="passenger_age" name="passenger_age" 
+             min="1" max="120" required aria-required="true">
     </div>
 
     <!-- Add this Seat Class Dropdown -->

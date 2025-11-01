@@ -9,13 +9,13 @@
     <div class="card">
       <div class="card-header">Add New Train</div>
       <div class="card-body">
-        <form action="{{ url_for('add_train') }}" method="post">
+        <form action="{{ url_for('add_train') }}" method="post" aria-label="Add new train form">
           <!-- Form fields for adding a train -->
-          <div class="mb-3"><label for="train_name" class="form-label">Train Name</label><input type="text" class="form-control" id="train_name" name="train_name" required></div>
-          <div class="mb-3"><label for="source" class="form-label">Source</label><input type="text" class="form-control" id="source" name="source" required></div>
-          <div class="mb-3"><label for="destination" class="form-label">Destination</label><input type="text" class="form-control" id="destination" name="destination" required></div>
+          <div class="mb-3"><label for="train_name" class="form-label">Train Name</label><input type="text" class="form-control" id="train_name" name="train_name" required maxlength="100"></div>
+          <div class="mb-3"><label for="source" class="form-label">Source</label><input type="text" class="form-control" id="source" name="source" required maxlength="100"></div>
+          <div class="mb-3"><label for="destination" class="form-label">Destination</label><input type="text" class="form-control" id="destination" name="destination" required maxlength="100"></div>
           <div class="mb-3"><label for="departure_time" class="form-label">Departure Time</label><input type="time" class="form-control" id="departure_time" name="departure_time" required></div>
-          <div class="mb-3"><label for="total_seats" class="form-label">Total Seats</label><input type="number" class="form-control" id="total_seats" name="total_seats" min="0" required></div>
+          <div class="mb-3"><label for="total_seats" class="form-label">Total Seats</label><input type="number" class="form-control" id="total_seats" name="total_seats" min="1" max="5000" required></div>
           <button type="submit" class="btn btn-primary">Add Train</button>
         </form>
       </div>
@@ -67,6 +67,48 @@
                 </tbody>
               </table>
             </div>
+            <!-- Pagination -->
+            {% if pagination and pagination.pages > 1 %}
+            <nav aria-label="Bookings pagination">
+              <ul class="pagination justify-content-center mt-3">
+                {% if pagination.has_prev %}
+                <li class="page-item">
+                  <a class="page-link" href="{{ url_for('admin_dashboard', page=pagination.prev_num) }}" aria-label="Previous">
+                    <span aria-hidden="true">&laquo;</span>
+                  </a>
+                </li>
+                {% else %}
+                <li class="page-item disabled">
+                  <span class="page-link">&laquo;</span>
+                </li>
+                {% endif %}
+                
+                {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                  {% if page_num %}
+                    {% if page_num != pagination.page %}
+                    <li class="page-item"><a class="page-link" href="{{ url_for('admin_dashboard', page=page_num) }}">{{ page_num }}</a></li>
+                    {% else %}
+                    <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                    {% endif %}
+                  {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                  {% endif %}
+                {% endfor %}
+                
+                {% if pagination.has_next %}
+                <li class="page-item">
+                  <a class="page-link" href="{{ url_for('admin_dashboard', page=pagination.next_num) }}" aria-label="Next">
+                    <span aria-hidden="true">&raquo;</span>
+                  </a>
+                </li>
+                {% else %}
+                <li class="page-item disabled">
+                  <span class="page-link">&raquo;</span>
+                </li>
+                {% endif %}
+              </ul>
+            </nav>
+            {% endif %}
           </div>
         </div>
       </div>
