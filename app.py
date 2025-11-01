@@ -195,9 +195,18 @@ def index():
 
 @app.route('/search', methods=['POST'])
 def search():
-    source = request.form['source']
-    destination = request.form['destination']
-    time_filter = request.form['time_filter']
+    source = request.form.get('source', '').strip()
+    destination = request.form.get('destination', '').strip()
+    time_filter = request.form.get('time_filter', 'all')
+    
+    # Validate inputs
+    if not source or not destination:
+        flash('Please provide both source and destination.', 'warning')
+        return redirect(url_for('index'))
+    
+    if len(source) > 100 or len(destination) > 100:
+        flash('Station names are too long.', 'danger')
+        return redirect(url_for('index'))
 
     # FIX: Use a case-insensitive search with func.lower()
     query = Train.query.filter(
@@ -256,12 +265,35 @@ def submit_booking():
         flash('You must be logged in to book a ticket.', 'danger')
         return redirect(url_for('login'))
 
-    train_id = request.form['train_id']
-    passenger_name = request.form['passenger_name']
-    passenger_age = int(request.form['passenger_age'])
-    seat_class = request.form['seat_class']
+    train_id = request.form.get('train_id')
+    passenger_name = request.form.get('passenger_name', '').strip()
+    passenger_age_str = request.form.get('passenger_age', '')
+    seat_class = request.form.get('seat_class', 'Sleeper')
     requested_berth = request.form.get('berth_preference')
     save_passenger = request.form.get('save_passenger')
+    
+    # Validate inputs
+    if not train_id or not passenger_name or not passenger_age_str:
+        flash('Please provide all required booking details.', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        passenger_age = int(passenger_age_str)
+        if passenger_age < 1 or passenger_age > 120:
+            flash('Please enter a valid age between 1 and 120.', 'danger')
+            return redirect(url_for('index'))
+    except ValueError:
+        flash('Please enter a valid age.', 'danger')
+        return redirect(url_for('index'))
+    
+    if len(passenger_name) > 100:
+        flash('Passenger name is too long.', 'danger')
+        return redirect(url_for('index'))
+    
+    valid_classes = ['Sleeper', 'AC 3 Tier', 'AC 2 Tier', 'AC 1st Class']
+    if seat_class not in valid_classes:
+        flash('Invalid seat class selected.', 'danger')
+        return redirect(url_for('index'))
     
     # Fetch train details
     train_to_book = Train.query.get_or_404(train_id)
@@ -330,12 +362,16 @@ def booking_confirmation(pnr):
 
 @app.route('/pnr_status')
 def pnr_status():
-    pnr = request.args.get('pnr')
+    pnr = request.args.get('pnr', '').strip()
     if not pnr:
         flash('Please enter a PNR number.', 'warning')
         return redirect(url_for('index'))
+    
+    if len(pnr) > 20:
+        flash('Invalid PNR format.', 'danger')
+        return redirect(url_for('index'))
 
-    booking = Booking.query.filter_by(pnr_number=pnr.strip()).first()
+    booking = Booking.query.filter_by(pnr_number=pnr).first()
 
     if booking:
         return render_template('ticket_details.html', booking=booking)
@@ -430,10 +466,23 @@ def print_ticket(pnr):
 
 @app.route('/signup', methods=['POST'])
 def signup():
-    username = request.form['username']
-    password = request.form['password']
-    email = request.form.get('email')
-    phone = request.form.get('phone')
+    username = request.form.get('username', '').strip()
+    password = request.form.get('password', '')
+    email = request.form.get('email', '').strip()
+    phone = request.form.get('phone', '').strip()
+    
+    # Validate inputs
+    if not username or not password:
+        flash('Username and password are required.', 'danger')
+        return redirect(url_for('index'))
+    
+    if len(username) < 3 or len(username) > 80:
+        flash('Username must be between 3 and 80 characters.', 'danger')
+        return redirect(url_for('index'))
+    
+    if len(password) < 6:
+        flash('Password must be at least 6 characters long.', 'danger')
+        return redirect(url_for('index'))
 
     if User.query.filter_by(username=username).first():
         flash('Username already exists.', 'danger')
@@ -476,10 +525,21 @@ def admin_dashboard():
         flash('You must be an admin to access this page.', 'danger')
         return redirect(url_for('login'))
     
-    all_bookings = Booking.query.order_by(Booking.id.desc()).all()
+    # Add pagination for bookings
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    
+    bookings_pagination = Booking.query.order_by(Booking.id.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    all_bookings = bookings_pagination.items
+    
     all_trains = Train.query.order_by(Train.train_name).all()
     
-    return render_template('admin_dashboard.html', bookings=all_bookings, trains=all_trains)
+    return render_template('admin_dashboard.html', 
+                         bookings=all_bookings, 
+                         trains=all_trains,
+                         pagination=bookings_pagination)
 
 @app.route('/logout')
 def logout():
@@ -510,9 +570,28 @@ def profile():
         action = request.args.get('action')
         
         if action == 'add_passenger':
-            name = request.form['passenger_name']
-            age = request.form['passenger_age']
-            berth_preference = request.form.get('berth_preference')
+            name = request.form.get('passenger_name', '').strip()
+            age_str = request.form.get('passenger_age', '')
+            berth_preference = request.form.get('berth_preference', '').strip()
+            
+            # Validate inputs
+            if not name or not age_str:
+                flash('Passenger name and age are required.', 'danger')
+                return redirect(url_for('profile'))
+            
+            try:
+                age = int(age_str)
+                if age < 1 or age > 120:
+                    flash('Please enter a valid age between 1 and 120.', 'danger')
+                    return redirect(url_for('profile'))
+            except ValueError:
+                flash('Please enter a valid age.', 'danger')
+                return redirect(url_for('profile'))
+            
+            if len(name) > 100:
+                flash('Passenger name is too long.', 'danger')
+                return redirect(url_for('profile'))
+            
             new_passenger = Passenger(user_id=user_id, name=name, age=age, berth_preference=berth_preference)
             db.session.add(new_passenger)
             db.session.commit()
@@ -528,9 +607,18 @@ def profile():
             return redirect(url_for('profile'))
         
         else: # Handle standard profile updates
-            new_username = request.form['username']
-            new_email = request.form['email']
-            new_phone = request.form['phone']
+            new_username = request.form.get('username', '').strip()
+            new_email = request.form.get('email', '').strip()
+            new_phone = request.form.get('phone', '').strip()
+            
+            # Validate inputs
+            if not new_username:
+                flash('Username cannot be empty.', 'danger')
+                return redirect(url_for('profile'))
+            
+            if len(new_username) < 3 or len(new_username) > 80:
+                flash('Username must be between 3 and 80 characters.', 'danger')
+                return redirect(url_for('profile'))
 
             if new_username != user.username and User.query.filter_by(username=new_username).first():
                 flash('This username is already taken. Please choose a different one.', 'danger')
@@ -557,9 +645,18 @@ def change_password():
         return redirect(url_for('login'))
 
     user = User.query.get(session['user_id'])
-    current_password = request.form['current_password']
-    new_password = request.form['new_password']
-    confirm_password = request.form['confirm_password']
+    current_password = request.form.get('current_password', '')
+    new_password = request.form.get('new_password', '')
+    confirm_password = request.form.get('confirm_password', '')
+    
+    # Validate inputs
+    if not current_password or not new_password or not confirm_password:
+        flash('All password fields are required.', 'danger')
+        return redirect(url_for('profile'))
+    
+    if len(new_password) < 6:
+        flash('New password must be at least 6 characters long.', 'danger')
+        return redirect(url_for('profile'))
 
     if not user.check_password(current_password):
         flash('Incorrect current password.', 'danger')
@@ -596,11 +693,29 @@ def add_train():
     if not session.get('is_admin'):
         return redirect(url_for('login'))
 
-    train_name = request.form['train_name']
-    source = request.form['source']
-    destination = request.form['destination']
-    departure_time = request.form['departure_time']
-    total_seats = request.form['total_seats']
+    train_name = request.form.get('train_name', '').strip()
+    source = request.form.get('source', '').strip()
+    destination = request.form.get('destination', '').strip()
+    departure_time = request.form.get('departure_time', '').strip()
+    total_seats_str = request.form.get('total_seats', '')
+    
+    # Validate inputs
+    if not train_name or not source or not destination or not departure_time or not total_seats_str:
+        flash('All fields are required to add a train.', 'danger')
+        return redirect(url_for('admin_dashboard'))
+    
+    try:
+        total_seats = int(total_seats_str)
+        if total_seats < 1 or total_seats > 5000:
+            flash('Total seats must be between 1 and 5000.', 'danger')
+            return redirect(url_for('admin_dashboard'))
+    except ValueError:
+        flash('Please enter a valid number for total seats.', 'danger')
+        return redirect(url_for('admin_dashboard'))
+    
+    if len(train_name) > 100 or len(source) > 100 or len(destination) > 100:
+        flash('Train name or station names are too long.', 'danger')
+        return redirect(url_for('admin_dashboard'))
 
     new_train = Train(
         train_name=train_name,
