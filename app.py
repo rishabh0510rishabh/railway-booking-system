@@ -6,6 +6,8 @@ import string
 import math
 import qrcode
 import base64
+import logging
+import tempfile
 from io import BytesIO
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory, send_file
@@ -14,6 +16,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from fpdf import FPDF
 from sqlalchemy.orm import relationship
 from sqlalchemy import func
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize the Flask app
 app = Flask(__name__)
@@ -320,6 +326,7 @@ def submit_booking():
         rac_bookings = Booking.query.filter_by(train_id=train_id, status='RAC').count()
         waitlisted_bookings = Booking.query.filter_by(train_id=train_id, status='Waitlisted').count()
     except Exception as e:
+        logger.error(f"Error fetching booking counts: {str(e)}", exc_info=True)
         flash('An error occurred while processing your booking. Please try again.', 'danger')
         return redirect(url_for('index'))
 
@@ -375,6 +382,7 @@ def submit_booking():
         db.session.commit()
     except Exception as e:
         db.session.rollback()
+        logger.error(f"Error booking ticket: {str(e)}", exc_info=True)
         flash('An error occurred while booking your ticket. Please try again.', 'danger')
         return redirect(url_for('index'))
     
@@ -469,15 +477,31 @@ def download_ticket(pnr):
         pdf.set_xy(15, 154)
         pdf.cell(0, 8, f"Total Fare: ${booking.fare:.2f}", 0, 1, 'L')
         
-        # Define the filename for the temporary PDF
-        pdf_filename = f"ticket_{pnr}.pdf"
+        # Use a temporary file that will be automatically cleaned up
+        with tempfile.NamedTemporaryFile(mode='wb', suffix='.pdf', delete=False) as tmp_file:
+            pdf_filename = tmp_file.name
+            pdf.output(pdf_filename)
         
-        # Save the PDF to a file on the server
-        pdf.output(pdf_filename)
-
-        # Send the file to the user for download
-        return send_file(pdf_filename, as_attachment=True)
+        try:
+            # Send the file to the user for download
+            response = send_file(pdf_filename, as_attachment=True, download_name=f"ticket_{pnr}.pdf")
+            # Schedule cleanup after sending
+            @response.call_on_close
+            def cleanup():
+                try:
+                    os.unlink(pdf_filename)
+                except Exception as e:
+                    logger.error(f"Error cleaning up PDF file: {str(e)}")
+            return response
+        except Exception as send_error:
+            # Clean up file if sending fails
+            try:
+                os.unlink(pdf_filename)
+            except:
+                pass
+            raise send_error
     except Exception as e:
+        logger.error(f"Error generating PDF ticket: {str(e)}", exc_info=True)
         flash('An error occurred while generating the PDF ticket.', 'danger')
         return redirect(url_for('booking_confirmation', pnr=pnr))
 
@@ -529,6 +553,7 @@ def signup():
         flash('Account created successfully! Please log in.', 'success')
     except Exception as e:
         db.session.rollback()
+        logger.error(f"Error creating account: {str(e)}", exc_info=True)
         flash('An error occurred while creating your account. Please try again.', 'danger')
     
     return redirect(url_for('index'))
@@ -632,6 +657,7 @@ def profile():
                 flash(f'Passenger "{name}" added successfully!', 'success')
             except Exception as e:
                 db.session.rollback()
+                logger.error(f"Error adding passenger: {str(e)}", exc_info=True)
                 flash('An error occurred while adding the passenger.', 'danger')
             return redirect(url_for('profile'))
         
@@ -644,6 +670,7 @@ def profile():
                 flash('Saved passenger removed.', 'info')
             except Exception as e:
                 db.session.rollback()
+                logger.error(f"Error removing passenger: {str(e)}", exc_info=True)
                 flash('An error occurred while removing the passenger.', 'danger')
             return redirect(url_for('profile'))
         
@@ -675,6 +702,7 @@ def profile():
                 flash('Profile updated successfully!', 'success')
             except Exception as e:
                 db.session.rollback()
+                logger.error(f"Error updating profile: {str(e)}", exc_info=True)
                 flash('An error occurred while updating your profile.', 'danger')
             return redirect(url_for('profile'))
     
@@ -714,6 +742,7 @@ def change_password():
             flash('Password updated successfully!', 'success')
         except Exception as e:
             db.session.rollback()
+            logger.error(f"Error updating password: {str(e)}", exc_info=True)
             flash('An error occurred while updating your password.', 'danger')
 
     return redirect(url_for('profile'))
@@ -779,6 +808,7 @@ def add_train():
         flash(f'Train "{train_name}" has been added successfully!', 'success')
     except Exception as e:
         db.session.rollback()
+        logger.error(f"Error adding train: {str(e)}", exc_info=True)
         flash('An error occurred while adding the train. Please try again.', 'danger')
     
     return redirect(url_for('admin_dashboard'))
