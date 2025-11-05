@@ -196,6 +196,10 @@ def generate_qr_code(data):
 
 # --- Routes ---
 @app.route('/')
+def landing():
+    return render_template('landing.html')
+
+@app.route('/index')
 def index():
     return render_template('index.html')
 
