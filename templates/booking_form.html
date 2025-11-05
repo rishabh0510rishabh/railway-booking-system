@@ -157,8 +157,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Handle "Pay Now" button click
     payNowBtn.addEventListener('click', function() {
-        fareModal.hide(); // Hide the modal
-        bookingForm.submit(); // Submit the form
+        // Listen for the modal to fully hide before submitting
+        const modalElement = document.getElementById('fareModal');
+        modalElement.addEventListener('hidden.bs.modal', function() {
+            bookingForm.submit(); // Submit the form after modal is fully hidden
+        }, { once: true }); // Use 'once' to ensure this listener only fires once
+        
+        fareModal.hide(); // Start hiding the modal
     });
 });
 </script>
