@@ -160,8 +160,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Handle "Pay Now" button click
     payNowBtn.addEventListener('click', function() {
+        // Show loading overlay immediately
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        if (loadingOverlay) {
+            loadingOverlay.classList.add('active');
+        }
+        
+        // Hide the modal and submit form after modal animation completes
+        const modalElement = document.getElementById('fareModal');
+        modalElement.addEventListener('hidden.bs.modal', function onModalHidden() {
+            bookingForm.submit(); // Submit the form after modal is fully hidden
+            modalElement.removeEventListener('hidden.bs.modal', onModalHidden);
+        });
         fareModal.hide(); // Hide the modal
-        bookingForm.submit(); // Submit the form
     });
 });
 </script>
