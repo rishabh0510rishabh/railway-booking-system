@@ -157,8 +157,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Handle "Pay Now" button click
     payNowBtn.addEventListener('click', function() {
-        // Listen for the modal to fully hide before submitting
+        // Get the modal DOM element
         const modalElement = document.getElementById('fareModal');
+        
+        // Listen for the modal to fully hide before submitting
         modalElement.addEventListener('hidden.bs.modal', function() {
             bookingForm.submit(); // Submit the form after modal is fully hidden
         }, { once: true }); // Use 'once' to ensure this listener only fires once
