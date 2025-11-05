@@ -1,2 +1,5 @@
 __pycache__/
 venv/
+echo "__pycache__/
+*.db
+*.pdf
