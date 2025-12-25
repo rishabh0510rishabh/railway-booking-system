@@ -5,6 +5,7 @@ import string
 import math
 import qrcode
 import base64
+import tempfile  # <--- NEW IMPORT
 from io import BytesIO
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, make_response
@@ -196,7 +197,13 @@ def book(train_id):
             flash('Sorry, this train is fully waitlisted.', 'danger')
             return redirect(url_for('index'))
     
-    user = User.objects.get(id=session['user_id'])
+    try:
+        user = User.objects.get(id=session['user_id'])
+    except User.DoesNotExist:
+        session.clear()
+        flash('Session expired. Please log in again.', 'warning')
+        return redirect(url_for('login'))
+
     return render_template('booking_form.html', train=train_to_book, saved_passengers=user.saved_passengers)
 
 @app.route('/submit_booking', methods=['POST'])
@@ -204,9 +211,15 @@ def submit_booking():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
 
+    try:
+        user = User.objects.get(id=session['user_id'])
+    except User.DoesNotExist:
+        session.clear()
+        flash('Session expired. Please log in again.', 'warning')
+        return redirect(url_for('login'))
+
     train_id = request.form['train_id']
     train_to_book = Train.objects.get(id=train_id)
-    user = User.objects.get(id=session['user_id'])
     
     passenger_name = request.form['passenger_name']
     passenger_age = int(request.form['passenger_age'])
@@ -278,49 +291,80 @@ def pnr_status():
 def download_ticket(pnr):
     booking = Booking.objects.get_or_404(pnr_number=pnr)
     
-    # Init FPDF
     pdf = FPDF(unit="mm", format="A4")
     pdf.add_page()
     
-    # Generate QR Code
-    qr_data = f"PNR: {booking.pnr_number}, Passenger: {booking.passenger_name}"
+    # 1. Enhanced QR Data
+    qr_data = (f"PNR: {booking.pnr_number}\n"
+               f"Name: {booking.passenger_name}\n"
+               f"Age: {booking.passenger_age}\n"
+               f"Train: {booking.train.train_name}\n"
+               f"Seat: {booking.seat_number or 'WL/RAC'}\n"
+               f"Berth: {booking.berth_preference or 'N/A'}")
+    
     qr_base64 = generate_qr_code(qr_data)
     
-    # Ticket Design
-    pdf.set_font("Helvetica", "B", 24)
-    pdf.cell(0, 15, "Railway E-Ticket", 0, 1, 'C') 
-    pdf.ln(5)
-    
-    pdf.set_draw_color(100, 100, 100)
-    pdf.rect(10, 35, 190, 120)
-    pdf.image(f"data:image/png;base64,{qr_base64}", x=160, y=40, w=30)
-    
+    # 2. Add QR Image to PDF (using Temp File)
+    try:
+        qr_bytes = base64.b64decode(qr_base64)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as temp_qr:
+            temp_qr.write(qr_bytes)
+            temp_qr_path = temp_qr.name
+            
+        pdf.set_font("Helvetica", "B", 24)
+        pdf.cell(0, 15, "Railway E-Ticket", 0, 1, 'C') 
+        pdf.ln(5)
+        
+        pdf.set_draw_color(100, 100, 100)
+        pdf.rect(10, 35, 190, 140) # Increased height for more details
+        
+        pdf.image(temp_qr_path, x=160, y=40, w=30)
+        os.remove(temp_qr_path)
+    except Exception as e:
+        print(f"QR Error: {e}")
+
+    # 3. Add More Ticket Details
     pdf.set_font("Helvetica", "B", 14)
     pdf.set_xy(15, 45)
     pdf.cell(0, 8, f"PNR Number: {booking.pnr_number}", 0, 1, 'L')
     pdf.set_xy(15, 55)
     pdf.cell(0, 8, f"Status: {booking.status}", 0, 1, 'L')
     
+    # Passenger Section
     pdf.set_font("Helvetica", "B", 12)
-    pdf.set_xy(15, 70)
+    pdf.set_xy(15, 75)
     pdf.cell(0, 8, "Passenger Details", 0, 1, 'L')
+    
     pdf.set_font("Helvetica", "", 12)
-    pdf.set_xy(15, 78)
+    pdf.set_xy(15, 83)
     pdf.cell(0, 8, f"Name: {booking.passenger_name}", 0, 1, 'L')
+    pdf.set_xy(15, 91)
+    pdf.cell(0, 8, f"Age: {booking.passenger_age} years", 0, 1, 'L')
+    pdf.set_xy(15, 99)
+    pdf.cell(0, 8, f"Berth Preference: {booking.berth_preference or 'None'}", 0, 1, 'L')
     
+    # Journey Section
     pdf.set_font("Helvetica", "B", 12)
-    pdf.set_xy(15, 100)
+    pdf.set_xy(15, 115)
     pdf.cell(0, 8, "Journey Details", 0, 1, 'L')
+    
     pdf.set_font("Helvetica", "", 12)
-    pdf.set_xy(15, 108)
+    pdf.set_xy(15, 123)
     pdf.cell(0, 8, f"Train: {booking.train.train_name}", 0, 1, 'L')
-    pdf.set_xy(15, 116)
+    pdf.set_xy(15, 131)
     pdf.cell(0, 8, f"Route: {booking.train.source} -> {booking.train.destination}", 0, 1, 'L')
+    pdf.set_xy(15, 139)
+    pdf.cell(0, 8, f"Class: {booking.seat_class}", 0, 1, 'L')
+    pdf.set_xy(15, 147)
+    pdf.cell(0, 8, f"Seat/Berth No: {booking.seat_number or 'Allocated on Chart Preparation'}", 0, 1, 'L')
     
-    # Output PDF to memory buffer instead of file
-    # 'latin-1' encoding is standard for FPDF output string
+    # Fare
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_text_color(25, 135, 84) 
+    pdf.set_xy(15, 162)
+    pdf.cell(0, 8, f"Total Fare: ${booking.fare:.2f}", 0, 1, 'L')
+    
     pdf_output = pdf.output(dest='S').encode('latin-1')
-    
     response = make_response(pdf_output)
     response.headers.set('Content-Disposition', 'attachment', filename=f'ticket_{pnr}.pdf')
     response.headers.set('Content-Type', 'application/pdf')
@@ -329,7 +373,16 @@ def download_ticket(pnr):
 @app.route('/print_ticket/<pnr>')
 def print_ticket(pnr):
     booking = Booking.objects.get_or_404(pnr_number=pnr)
-    qr_base64 = generate_qr_code(booking.pnr_number)
+    
+    # Enhanced QR Data for Print View as well
+    qr_data = (f"PNR: {booking.pnr_number}\n"
+               f"Name: {booking.passenger_name}\n"
+               f"Age: {booking.passenger_age}\n"
+               f"Train: {booking.train.train_name}\n"
+               f"Seat: {booking.seat_number or 'WL/RAC'}\n"
+               f"Berth: {booking.berth_preference or 'N/A'}")
+               
+    qr_base64 = generate_qr_code(qr_data)
     return render_template('print_ticket.html', booking=booking, qr_code=qr_base64)
 
 @app.route('/signup', methods=['POST'])
@@ -364,7 +417,25 @@ def login():
 @app.route('/admin/dashboard')
 def admin_dashboard():
     if not session.get('is_admin'): return redirect(url_for('login'))
-    return render_template('admin_dashboard.html', bookings=Booking.objects().order_by('-id'), trains=Train.objects().order_by('train_name'))
+    
+    # Pagination settings
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+    
+    # Calculate pagination details
+    total_bookings = Booking.objects.count()
+    total_pages = math.ceil(total_bookings / per_page)
+    
+    # Fetch specific page of bookings (Optimized query)
+    paginated_bookings = Booking.objects().order_by('-id').skip((page - 1) * per_page).limit(per_page)
+    
+    all_trains = Train.objects().order_by('train_name')
+    
+    return render_template('admin_dashboard.html', 
+                           bookings=paginated_bookings, 
+                           trains=all_trains,
+                           page=page,
+                           total_pages=total_pages)
 
 @app.route('/logout')
 def logout():
@@ -375,14 +446,35 @@ def logout():
 @app.route('/my_bookings')
 def my_bookings():
     if not session.get('logged_in'): return redirect(url_for('login'))
-    user = User.objects.get(id=session['user_id'])
-    bookings = Booking.objects(user=user).order_by('-id')
-    return render_template('my_bookings.html', bookings=bookings)
+    try:
+        user = User.objects.get(id=session['user_id'])
+    except User.DoesNotExist:
+        session.clear()
+        return redirect(url_for('login'))
+        
+    # Pagination Logic
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+    
+    total_bookings = Booking.objects(user=user).count()
+    total_pages = math.ceil(total_bookings / per_page)
+    
+    # Fetch paginated bookings
+    bookings = Booking.objects(user=user).order_by('-id').skip((page - 1) * per_page).limit(per_page)
+    
+    return render_template('my_bookings.html', 
+                           bookings=bookings, 
+                           page=page, 
+                           total_pages=total_pages)
 
 @app.route('/profile', methods=['GET', 'POST'])
 def profile():
     if not session.get('logged_in'): return redirect(url_for('login'))
-    user = User.objects.get(id=session['user_id'])
+    try:
+        user = User.objects.get(id=session['user_id'])
+    except User.DoesNotExist:
+        session.clear()
+        return redirect(url_for('login'))
 
     if request.method == 'POST':
         action = request.args.get('action')
@@ -396,8 +488,6 @@ def profile():
             user.save()
         elif action == 'delete_passenger':
             pass_id = request.args.get('passenger_id')
-            # Filter out the passenger with matching UID (approximate matching for demo)
-            # In production, check object IDs rigorously
             user.saved_passengers = [p for p in user.saved_passengers if str(p.uid) != pass_id]
             user.save()
         else:
@@ -415,7 +505,12 @@ def profile():
 @app.route('/change_password', methods=['POST'])
 def change_password():
     if not session.get('logged_in'): return redirect(url_for('login'))
-    user = User.objects.get(id=session['user_id'])
+    try:
+        user = User.objects.get(id=session['user_id'])
+    except User.DoesNotExist:
+        session.clear()
+        return redirect(url_for('login'))
+        
     if not user.check_password(request.form['current_password']):
         flash('Incorrect current password.', 'danger')
     elif request.form['new_password'] != request.form['confirm_password']:
@@ -429,9 +524,12 @@ def change_password():
 @app.route('/profile/delete', methods=['POST'])
 def delete_account():
     if not session.get('logged_in'): return redirect(url_for('login'))
-    user = User.objects.get(id=session['user_id'])
-    Booking.objects(user=user).delete()
-    user.delete()
+    try:
+        user = User.objects.get(id=session['user_id'])
+        Booking.objects(user=user).delete()
+        user.delete()
+    except User.DoesNotExist:
+        pass
     session.clear()
     flash('Account deleted.', 'info')
     return redirect(url_for('index'))
@@ -451,17 +549,10 @@ def add_train():
 
 @app.route('/train_route_check')
 def train_route_check():
-    # MODIFIED: Search by train NAME or Partial Name instead of ID
     query = request.args.get('train_query')
-    
-    if not query:
-        return redirect(url_for('index'))
-
-    # Exact match first
+    if not query: return redirect(url_for('index'))
     train = Train.objects(train_name__iexact=query).first()
-    
     if not train:
-        # Partial match
         train = Train.objects(train_name__icontains=query).first()
     
     if train:
@@ -482,7 +573,6 @@ def train_route(train_id):
 @app.route('/book_return/<pnr>')
 def book_return(pnr):
     booking = Booking.objects.get_or_404(pnr_number=pnr)
-    # Reverse search
     return_train = Train.objects(source__iexact=booking.train.destination, destination__iexact=booking.train.source).first()
     if return_train:
         return redirect(url_for('book', train_id=return_train.id))
