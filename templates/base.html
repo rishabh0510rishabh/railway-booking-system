@@ -144,10 +144,10 @@
           <div class="modal-body">
             <form action="{{ url_for('train_route_check') }}" method="get">
               <div class="mb-3">
-                <label for="train_id" class="form-label">Train ID</label>
-                <input type="number" class="form-control" id="train_id" name="train_id" required>
+                <label for="train_query" class="form-label">Train Name</label>
+                <input type="text" class="form-control" id="train_query" name="train_query" placeholder="e.g. Rajdhani Express" required>
               </div>
-              <button type="submit" class="btn btn-primary w-100">View Route</button>
+              <button type="submit" class="btn btn-primary w-100">Search Route</button>
             </form>
           </div>
         </div>

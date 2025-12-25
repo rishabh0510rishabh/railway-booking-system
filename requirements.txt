@@ -1,6 +1,6 @@
-flask
+flask<2.3
+werkzeug<3.0
 flask-mongoengine
-werkzeug
 fpdf
 qrcode
 Pillow

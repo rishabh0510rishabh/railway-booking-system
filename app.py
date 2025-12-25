@@ -7,7 +7,7 @@ import qrcode
 import base64
 from io import BytesIO
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, make_response
 from flask_mongoengine import MongoEngine
 from werkzeug.security import generate_password_hash, check_password_hash
 from fpdf import FPDF
@@ -17,8 +17,6 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'a-very-secret-key-for-flashing'
 
 # --- MongoDB Configuration ---
-# Update this URI with your MongoDB Atlas connection string for production
-# For local development: 'mongodb://localhost:27017/railway_db'
 app.config['MONGODB_SETTINGS'] = {
     'host': os.environ.get('MONGO_URI', 'mongodb://localhost:27017/railway_db')
 }
@@ -35,7 +33,7 @@ SEATS_PER_COACH = {
     'Sleeper': 72, 'AC 3 Tier': 64, 'AC 2 Tier': 46, 'AC 1st Class': 18
 }
 
-# --- Database Models (Documents) ---
+# --- Database Models ---
 
 class Route(db.EmbeddedDocument):
     stop_name = db.StringField(required=True)
@@ -43,27 +41,22 @@ class Route(db.EmbeddedDocument):
     stop_order = db.IntField(required=True)
 
 class Train(db.Document):
-    # MongoDB creates a unique _id automatically
     train_name = db.StringField(required=True)
     source = db.StringField(required=True)
     destination = db.StringField(required=True)
-    departure_time = db.StringField(required=True) # e.g., '06:15'
+    departure_time = db.StringField(required=True) 
     arrival_time = db.StringField()
     total_seats = db.IntField(required=True)
-    # Embed routes directly in the train document
     route_stops = db.ListField(db.EmbeddedDocumentField(Route))
 
-    # Helper properties to match old SQLAlchemy usage in templates
     @property
     def id(self):
         return str(self.pk)
 
 class Passenger(db.EmbeddedDocument):
-    # Embedded inside User
     name = db.StringField(required=True)
     age = db.IntField(required=True)
     berth_preference = db.StringField()
-    # Simple ID generation for the UI logic
     uid = db.StringField(default=lambda: ''.join(random.choices(string.digits, k=8)))
 
 class User(db.Document):
@@ -73,7 +66,6 @@ class User(db.Document):
     email = db.StringField()
     phone_number = db.StringField()
     profile_picture = db.StringField()
-    # Embed saved passengers list directly in User document
     saved_passengers = db.ListField(db.EmbeddedDocumentField(Passenger))
 
     def set_password(self, password):
@@ -88,10 +80,8 @@ class User(db.Document):
 
 class Booking(db.Document):
     pnr_number = db.StringField(unique=True, required=True)
-    # References to other documents
     train = db.ReferenceField(Train, required=True)
     user = db.ReferenceField(User, required=True)
-    
     passenger_name = db.StringField(required=True)
     passenger_age = db.IntField(required=True)
     seat_class = db.StringField(default='Sleeper')
@@ -188,8 +178,12 @@ def book(train_id):
     if not session.get('logged_in'):
         flash('You must be logged in to book a ticket.', 'danger')
         return redirect(url_for('login'))
-
-    train_to_book = Train.objects.get_or_404(id=train_id)
+    
+    try:
+        train_to_book = Train.objects.get_or_404(id=train_id)
+    except:
+         flash('Train not found.', 'danger')
+         return redirect(url_for('index'))
     
     confirmed_count = Booking.objects(train=train_to_book, status='Confirmed').count()
     rac_count = Booking.objects(train=train_to_book, status='RAC').count()
@@ -283,12 +277,16 @@ def pnr_status():
 @app.route('/download_ticket/<pnr>')
 def download_ticket(pnr):
     booking = Booking.objects.get_or_404(pnr_number=pnr)
+    
+    # Init FPDF
     pdf = FPDF(unit="mm", format="A4")
     pdf.add_page()
     
+    # Generate QR Code
     qr_data = f"PNR: {booking.pnr_number}, Passenger: {booking.passenger_name}"
     qr_base64 = generate_qr_code(qr_data)
     
+    # Ticket Design
     pdf.set_font("Helvetica", "B", 24)
     pdf.cell(0, 15, "Railway E-Ticket", 0, 1, 'C') 
     pdf.ln(5)
@@ -315,11 +313,18 @@ def download_ticket(pnr):
     pdf.cell(0, 8, "Journey Details", 0, 1, 'L')
     pdf.set_font("Helvetica", "", 12)
     pdf.set_xy(15, 108)
-    pdf.cell(0, 8, f"Train: {booking.train.train_name} ({booking.train.source} -> {booking.train.destination})", 0, 1, 'L')
+    pdf.cell(0, 8, f"Train: {booking.train.train_name}", 0, 1, 'L')
+    pdf.set_xy(15, 116)
+    pdf.cell(0, 8, f"Route: {booking.train.source} -> {booking.train.destination}", 0, 1, 'L')
     
-    pdf_filename = f"ticket_{pnr}.pdf"
-    pdf.output(pdf_filename)
-    return send_file(pdf_filename, as_attachment=True)
+    # Output PDF to memory buffer instead of file
+    # 'latin-1' encoding is standard for FPDF output string
+    pdf_output = pdf.output(dest='S').encode('latin-1')
+    
+    response = make_response(pdf_output)
+    response.headers.set('Content-Disposition', 'attachment', filename=f'ticket_{pnr}.pdf')
+    response.headers.set('Content-Type', 'application/pdf')
+    return response
 
 @app.route('/print_ticket/<pnr>')
 def print_ticket(pnr):
@@ -391,7 +396,9 @@ def profile():
             user.save()
         elif action == 'delete_passenger':
             pass_id = request.args.get('passenger_id')
-            user.saved_passengers = [p for p in user.saved_passengers if str(p.uid) != pass_id] # Assuming you add a UID to passenger or match by props
+            # Filter out the passenger with matching UID (approximate matching for demo)
+            # In production, check object IDs rigorously
+            user.saved_passengers = [p for p in user.saved_passengers if str(p.uid) != pass_id]
             user.save()
         else:
             user.username = request.form['username']
@@ -444,12 +451,33 @@ def add_train():
 
 @app.route('/train_route_check')
 def train_route_check():
-    return redirect(url_for('train_route', train_id=request.args.get('train_id')))
+    # MODIFIED: Search by train NAME or Partial Name instead of ID
+    query = request.args.get('train_query')
+    
+    if not query:
+        return redirect(url_for('index'))
+
+    # Exact match first
+    train = Train.objects(train_name__iexact=query).first()
+    
+    if not train:
+        # Partial match
+        train = Train.objects(train_name__icontains=query).first()
+    
+    if train:
+        return redirect(url_for('train_route', train_id=train.id))
+    else:
+        flash(f'No train found matching "{query}".', 'danger')
+        return redirect(url_for('index'))
 
 @app.route('/train_route/<train_id>')
 def train_route(train_id):
-    train = Train.objects.get_or_404(id=train_id)
-    return render_template('train_route.html', train=train)
+    try:
+        train = Train.objects.get_or_404(id=train_id)
+        return render_template('train_route.html', train=train)
+    except:
+        flash('Invalid train ID.', 'danger')
+        return redirect(url_for('index'))
 
 @app.route('/book_return/<pnr>')
 def book_return(pnr):
