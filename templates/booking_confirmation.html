@@ -20,7 +20,7 @@
       <p><strong>Seat Class:</strong> {{ booking.seat_class }}</p> 
       <p><strong>Berth/Seat:</strong> {{ booking.seat_number or 'N/A' }}</p>
       <p><strong>Final Status:</strong> <span class="badge bg-primary">{{ booking.status }}</span></p>
-      <p><strong>Fare Paid:</strong> <span class="fw-bold text-success">${{ booking.fare|round(2) }}</span></p>
+      <p><strong>Fare Paid:</strong> <span class="fw-bold text-success">₹{{ booking.fare|round(2) }}</span></p>
     </div>
   </div>
 

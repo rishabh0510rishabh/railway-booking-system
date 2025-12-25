@@ -12,6 +12,8 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from flask_mongoengine import MongoEngine
 from werkzeug.security import generate_password_hash, check_password_hash
 from fpdf import FPDF
+from flask_mail import Mail, Message
+from dotenv import load_dotenv
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'a-very-secret-key-for-flashing'
@@ -23,6 +25,14 @@ app.config['UPLOAD_FOLDER'] = 'static/uploads/profiles'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USERNAME'] = os.environ.get('EMAIL_USER') # Your email
+app.config['MAIL_PASSWORD'] = os.environ.get('EMAIL_PASS') # App Password (not login password)
+app.config['MAIL_USE_TLS'] = False
+app.config['MAIL_USE_SSL'] = True
+mail = Mail(app)
 
 db = MongoEngine(app)
 
@@ -85,6 +95,23 @@ class Booking(db.Document):
     status = db.StringField(default='Confirmed')
     seat_number = db.StringField()
     fare = db.FloatField(default=0.0)
+
+def send_ticket_email(user_email, ticket_data):
+    try:
+        msg = Message(
+            subject=f"Your Ticket Confirmation: #{ticket_data['pnr']}",
+            sender=app.config['MAIL_USERNAME'],
+            recipients=[user_email]
+        )
+        
+        # We send HTML for a professional look
+        msg.html = render_template('ticket_email.html', ticket=ticket_data)
+        
+        mail.send(msg)
+        return True
+    except Exception as e:
+        print(f"Error sending email: {e}")
+        return False    
 
 def generate_pnr():
     timestamp_part = str(int(time.time()))[-6:]
@@ -211,15 +238,26 @@ def submit_booking():
         flash('Session expired. Please log in again.', 'warning')
         return redirect(url_for('login'))
 
-    train_id = request.form['train_id']
+    # --- 1. Gather Data (Handle potential missing fields safely) ---
+    # We use .get() for optional fields to prevent 400 errors
+    name = request.form.get('full_name') or request.form.get('passenger_name')
+    email = request.form.get('email_address') or user.email # Fallback to user email
+    
+    # CRITICAL: Ensure we have a train ID. If form doesn't have it, we can't book.
+    train_id = request.form.get('train_id')
+    if not train_id:
+        flash("Booking failed: Missing Train ID", "danger")
+        return redirect(url_for('index'))
+        
     train_to_book = Train.objects.get(id=train_id)
     
-    passenger_name = request.form['passenger_name']
-    passenger_age = int(request.form['passenger_age'])
-    seat_class = request.form['seat_class']
+    passenger_name = request.form.get('passenger_name')
+    passenger_age = int(request.form.get('passenger_age', 0)) # Default to 0 if missing
+    seat_class = request.form.get('seat_class', 'Sleeper')
     requested_berth = request.form.get('berth_preference')
     save_passenger = request.form.get('save_passenger')
     
+    # --- 2. Calculate Seat Status (Your existing logic) ---
     confirmed_bookings = Booking.objects(train=train_to_book, status='Confirmed').count()
     rac_bookings = Booking.objects(train=train_to_book, status='RAC').count()
     waitlisted_bookings = Booking.objects(train=train_to_book, status='Waitlisted').count()
@@ -241,6 +279,7 @@ def submit_booking():
         waitlist_number = waitlisted_bookings + 1
         seat_number = f"WL-{waitlist_number}"
 
+    # --- 3. Save to Database ---
     new_booking = Booking(
         pnr_number=generate_pnr(),
         train=train_to_book,
@@ -262,6 +301,32 @@ def submit_booking():
             user.saved_passengers.append(new_p)
             user.save()
     
+    # --- 4. PREPARE EMAIL DATA (This was missing!) ---
+    ticket_details = {
+        'pnr': new_booking.pnr_number,
+        'passenger_name': passenger_name,
+        'passenger_age': passenger_age,
+        'train_name': train_to_book.train_name,
+        'route': f"{train_to_book.source} ➝ {train_to_book.destination}",
+        'departure_time': train_to_book.departure_time,
+        'seat_number': seat_number,
+        'seat_class': seat_class,
+        'status': status,
+        'fare': f"₹{new_booking.fare:.2f}",  # Format as currency
+        'booking_date': datetime.now().strftime("%d %b %Y")
+    }
+    
+    # --- 5. Send Email ---
+    # Use the email from the form, or fall back to the User's account email
+    target_email = email if email else user.email
+    
+    if target_email:
+        print(f"Sending email to {target_email}...") # Debug print
+        send_ticket_email(target_email, ticket_details)
+    else:
+        print("No email address found for user.")
+
+    # Redirect to confirmation (Standard flow)
     return redirect(url_for('booking_confirmation', pnr=new_booking.pnr_number))
 
 @app.route('/confirmation/<pnr>')
@@ -382,7 +447,7 @@ def download_ticket(pnr):
     pdf.set_xy(10, 140)
     pdf.set_font("Arial", "B", 12)
     pdf.set_text_color(*GREEN_PRICE)
-    pdf.cell(190, 8, f"TOTAL FARE: ${booking.fare:.2f}", 0, 0, 'C')
+    pdf.cell(190, 8, f"TOTAL FARE: ₹{booking.fare:.2f}", 0, 0, 'C')
 
     pdf_output = pdf.output(dest='S').encode('latin-1')
     response = make_response(pdf_output)

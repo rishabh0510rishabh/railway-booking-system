@@ -3,3 +3,4 @@ venv/
 echo "__pycache__/
 *.db
 *.pdf
+.env

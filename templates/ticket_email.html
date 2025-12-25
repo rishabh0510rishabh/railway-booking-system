@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ticket Confirmation</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; margin-top: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+        
+        <tr>
+            <td style="background-color: #1a73e8; padding: 30px; text-align: center; color: #ffffff;">
+                <h1 style="margin: 0; font-size: 24px; font-weight: bold;">🚆 Booking Confirmed!</h1>
+                <p style="margin: 10px 0 0; font-size: 16px; opacity: 0.9;">You are ready to travel.</p>
+            </td>
+        </tr>
+
+        <tr>
+            <td style="padding: 30px 30px 10px 30px;">
+                <div style="text-align: center; border-bottom: 2px dashed #eee; padding-bottom: 20px;">
+                    <p style="color: #666; font-size: 14px; margin: 0; text-transform: uppercase; letter-spacing: 1px;">PNR Number</p>
+                    <h2 style="color: #333; margin: 5px 0 0; font-size: 32px; letter-spacing: 2px;">{{ ticket.pnr }}</h2>
+                </div>
+            </td>
+        </tr>
+
+        <tr>
+            <td style="padding: 0 30px;">
+                <table width="100%" border="0" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td width="50%" style="padding-bottom: 20px; vertical-align: top;">
+                            <p style="color: #666; font-size: 12px; margin: 0;">TRAIN NAME</p>
+                            <p style="color: #333; font-weight: bold; margin: 5px 0 0;">{{ ticket.train_name }}</p>
+                        </td>
+                        <td width="50%" style="padding-bottom: 20px; vertical-align: top;">
+                            <p style="color: #666; font-size: 12px; margin: 0;">ROUTE</p>
+                            <p style="color: #333; font-weight: bold; margin: 5px 0 0;">{{ ticket.route }}</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td width="50%" style="padding-bottom: 20px; vertical-align: top;">
+                            <p style="color: #666; font-size: 12px; margin: 0;">DEPARTURE</p>
+                            <p style="color: #333; font-weight: bold; margin: 5px 0 0;">⏰ {{ ticket.departure_time }}</p>
+                        </td>
+                        <td width="50%" style="padding-bottom: 20px; vertical-align: top;">
+                            <p style="color: #666; font-size: 12px; margin: 0;">DATE</p>
+                            <p style="color: #333; font-weight: bold; margin: 5px 0 0;">📅 {{ ticket.booking_date }}</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+
+        <tr>
+            <td style="padding: 10px 30px;">
+                <div style="background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px;">
+                    <table width="100%" border="0" cellpadding="0" cellspacing="0">
+                        <tr>
+                            <td style="padding-bottom: 15px; border-bottom: 1px solid #e9ecef;">
+                                <span style="font-size: 18px;">👤 <strong>{{ ticket.passenger_name }}</strong></span>
+                                <span style="color: #666; font-size: 14px; margin-left: 5px;">({{ ticket.passenger_age }} Yrs)</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding-top: 15px;">
+                                <table width="100%">
+                                    <tr>
+                                        <td>
+                                            <p style="font-size: 12px; color: #666; margin:0;">SEAT</p>
+                                            <p style="font-weight: bold; color: #1a73e8; margin: 5px 0 0;">{{ ticket.seat_number }}</p>
+                                        </td>
+                                        <td>
+                                            <p style="font-size: 12px; color: #666; margin:0;">CLASS</p>
+                                            <p style="font-weight: bold; margin: 5px 0 0;">{{ ticket.seat_class }}</p>
+                                        </td>
+                                        <td>
+                                            <p style="font-size: 12px; color: #666; margin:0;">FARE</p>
+                                            <p style="font-weight: bold; color: #2e7d32; margin: 5px 0 0;">{{ ticket.fare }}</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </td>
+        </tr>
+
+        <tr>
+            <td style="padding: 20px 30px; text-align: center;">
+                <span style="background-color: #e6f4ea; color: #1e8e3e; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 14px; display: inline-block; border: 1px solid #ceead6;">
+                    ✅ Status: {{ ticket.status }}
+                </span>
+            </td>
+        </tr>
+
+        <tr>
+            <td style="padding: 20px 30px; background-color: #fff8e1; border-top: 1px solid #ffe0b2;">
+                <h3 style="margin: 0 0 10px 0; font-size: 14px; color: #f57c00;">⚠️ Important Instructions</h3>
+                <ul style="margin: 0; padding-left: 20px; color: #555; font-size: 13px; line-height: 1.6;">
+                    <li>Please carry a valid Original Photo ID proof (Aadhar/Voter ID).</li>
+                    <li>Arrive at the station at least 30 minutes before departure.</li>
+                    <li>For cancellations, please visit the "My Bookings" section on our website.</li>
+                </ul>
+            </td>
+        </tr>
+
+        <tr>
+            <td style="background-color: #333; padding: 20px; text-align: center; color: #aaa; font-size: 12px;">
+                <p style="margin: 0;">&copy; 2025 Railway Booking App. All rights reserved.</p>
+                <p style="margin: 5px 0 0;">Need help? Contact support@railwayapp.com</p>
+            </td>
+        </tr>
+
+    </table>
+    
+    <div style="height: 40px;"></div>
+
+</body>
+</html>
