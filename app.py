@@ -5,7 +5,7 @@ import string
 import math
 import qrcode
 import base64
-import tempfile  # <--- NEW IMPORT
+import tempfile
 from io import BytesIO
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, make_response
@@ -13,11 +13,9 @@ from flask_mongoengine import MongoEngine
 from werkzeug.security import generate_password_hash, check_password_hash
 from fpdf import FPDF
 
-# Initialize the Flask app
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'a-very-secret-key-for-flashing'
 
-# --- MongoDB Configuration ---
 app.config['MONGODB_SETTINGS'] = {
     'host': os.environ.get('MONGO_URI', 'mongodb://localhost:27017/railway_db')
 }
@@ -28,13 +26,10 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 db = MongoEngine(app)
 
-# Constants
 BASE_FARE = 1000
 SEATS_PER_COACH = {
     'Sleeper': 72, 'AC 3 Tier': 64, 'AC 2 Tier': 46, 'AC 1st Class': 18
 }
-
-# --- Database Models ---
 
 class Route(db.EmbeddedDocument):
     stop_name = db.StringField(required=True)
@@ -91,7 +86,6 @@ class Booking(db.Document):
     seat_number = db.StringField()
     fare = db.FloatField(default=0.0)
 
-# --- Helper Functions ---
 def generate_pnr():
     timestamp_part = str(int(time.time()))[-6:]
     random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
@@ -144,7 +138,6 @@ def generate_qr_code(data):
     img.save(buf)
     return base64.b64encode(buf.getvalue()).decode('ascii')
 
-# --- Routes ---
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -291,79 +284,106 @@ def pnr_status():
 def download_ticket(pnr):
     booking = Booking.objects.get_or_404(pnr_number=pnr)
     
-    pdf = FPDF(unit="mm", format="A4")
+    pdf = FPDF(orientation='P', unit='mm', format='A4')
     pdf.add_page()
     
-    # 1. Enhanced QR Data
-    qr_data = (f"PNR: {booking.pnr_number}\n"
-               f"Name: {booking.passenger_name}\n"
-               f"Age: {booking.passenger_age}\n"
-               f"Train: {booking.train.train_name}\n"
-               f"Seat: {booking.seat_number or 'WL/RAC'}\n"
-               f"Berth: {booking.berth_preference or 'N/A'}")
+    BLUE_HEADER = (13, 71, 161)
+    TEXT_COLOR = (50, 50, 50)
+    GREEN_PRICE = (46, 125, 50)
     
-    qr_base64 = generate_qr_code(qr_data)
+    pdf.set_fill_color(*BLUE_HEADER)
+    pdf.rect(10, 10, 190, 30, 'F')
     
-    # 2. Add QR Image to PDF (using Temp File)
-    try:
-        qr_bytes = base64.b64decode(qr_base64)
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as temp_qr:
-            temp_qr.write(qr_bytes)
-            temp_qr_path = temp_qr.name
-            
-        pdf.set_font("Helvetica", "B", 24)
-        pdf.cell(0, 15, "Railway E-Ticket", 0, 1, 'C') 
-        pdf.ln(5)
-        
-        pdf.set_draw_color(100, 100, 100)
-        pdf.rect(10, 35, 190, 140) # Increased height for more details
-        
-        pdf.image(temp_qr_path, x=160, y=40, w=30)
-        os.remove(temp_qr_path)
-    except Exception as e:
-        print(f"QR Error: {e}")
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Arial", "B", 20)
+    pdf.set_xy(20, 20)
+    pdf.cell(0, 0, "RAILWAY E-TICKET")
+    
+    pdf.set_font("Arial", "", 12)
+    pdf.set_xy(140, 18)
+    pdf.cell(50, 5, "PNR NUMBER", 0, 1, 'R')
+    pdf.set_font("Arial", "B", 16)
+    pdf.set_xy(140, 24)
+    pdf.cell(50, 5, booking.pnr_number, 0, 1, 'R')
+    
+    pdf.set_draw_color(200, 200, 200)
+    pdf.rect(10, 40, 190, 110)
+    
+    pdf.set_text_color(*TEXT_COLOR)
+    
+    y_start = 55
+    x_left = 20
+    
+    pdf.set_font("Arial", "B", 12)
+    pdf.set_xy(x_left, y_start)
+    pdf.set_text_color(*BLUE_HEADER)
+    pdf.cell(0, 10, "PASSENGER DETAILS")
+    pdf.line(x_left, y_start+8, 90, y_start+8)
+    
+    pdf.set_text_color(*TEXT_COLOR)
+    pdf.set_font("Arial", "", 11)
+    
+    details_left = [
+        ("Name", booking.passenger_name),
+        ("Age", f"{booking.passenger_age} Years"),
+        ("Berth", booking.berth_preference or 'No Preference'),
+        ("Status", booking.status)
+    ]
+    
+    y_pos = y_start + 15
+    for label, value in details_left:
+        pdf.set_font("Arial", "B", 10)
+        pdf.set_xy(x_left, y_pos)
+        pdf.cell(30, 6, f"{label}:")
+        pdf.set_font("Arial", "", 10)
+        pdf.cell(40, 6, value)
+        y_pos += 8
 
-    # 3. Add More Ticket Details
-    pdf.set_font("Helvetica", "B", 14)
-    pdf.set_xy(15, 45)
-    pdf.cell(0, 8, f"PNR Number: {booking.pnr_number}", 0, 1, 'L')
-    pdf.set_xy(15, 55)
-    pdf.cell(0, 8, f"Status: {booking.status}", 0, 1, 'L')
+    x_right = 110
     
-    # Passenger Section
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_xy(15, 75)
-    pdf.cell(0, 8, "Passenger Details", 0, 1, 'L')
+    pdf.set_font("Arial", "B", 12)
+    pdf.set_xy(x_right, y_start)
+    pdf.set_text_color(*BLUE_HEADER)
+    pdf.cell(0, 10, "JOURNEY DETAILS")
+    pdf.line(x_right, y_start+8, 180, y_start+8)
     
-    pdf.set_font("Helvetica", "", 12)
-    pdf.set_xy(15, 83)
-    pdf.cell(0, 8, f"Name: {booking.passenger_name}", 0, 1, 'L')
-    pdf.set_xy(15, 91)
-    pdf.cell(0, 8, f"Age: {booking.passenger_age} years", 0, 1, 'L')
-    pdf.set_xy(15, 99)
-    pdf.cell(0, 8, f"Berth Preference: {booking.berth_preference or 'None'}", 0, 1, 'L')
+    pdf.set_text_color(*TEXT_COLOR)
     
-    # Journey Section
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_xy(15, 115)
-    pdf.cell(0, 8, "Journey Details", 0, 1, 'L')
+    details_right = [
+        ("Train", booking.train.train_name),
+        ("Route", f"{booking.train.source} -> {booking.train.destination}"),
+        ("Class", booking.seat_class),
+        ("Seat No", booking.seat_number or 'Allocated later')
+    ]
     
-    pdf.set_font("Helvetica", "", 12)
-    pdf.set_xy(15, 123)
-    pdf.cell(0, 8, f"Train: {booking.train.train_name}", 0, 1, 'L')
-    pdf.set_xy(15, 131)
-    pdf.cell(0, 8, f"Route: {booking.train.source} -> {booking.train.destination}", 0, 1, 'L')
-    pdf.set_xy(15, 139)
-    pdf.cell(0, 8, f"Class: {booking.seat_class}", 0, 1, 'L')
-    pdf.set_xy(15, 147)
-    pdf.cell(0, 8, f"Seat/Berth No: {booking.seat_number or 'Allocated on Chart Preparation'}", 0, 1, 'L')
+    y_pos = y_start + 15
+    for label, value in details_right:
+        pdf.set_font("Arial", "B", 10)
+        pdf.set_xy(x_right, y_pos)
+        pdf.cell(30, 6, f"{label}:")
+        pdf.set_font("Arial", "", 10)
+        pdf.cell(40, 6, value)
+        y_pos += 8
+        
+    qr_data = f"PNR:{booking.pnr_number}|{booking.passenger_name}|{booking.train.train_name}"
+    qr_base64 = generate_qr_code(qr_data)
+    qr_bytes = base64.b64decode(qr_base64)
     
-    # Fare
-    pdf.set_font("Helvetica", "B", 14)
-    pdf.set_text_color(25, 135, 84) 
-    pdf.set_xy(15, 162)
-    pdf.cell(0, 8, f"Total Fare: ${booking.fare:.2f}", 0, 1, 'L')
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as temp_qr:
+        temp_qr.write(qr_bytes)
+        temp_qr_path = temp_qr.name
     
+    pdf.image(temp_qr_path, x=85, y=105, w=35)
+    os.remove(temp_qr_path)
+    
+    pdf.set_fill_color(240, 240, 240)
+    pdf.rect(11, 138, 188, 11, 'F')
+    
+    pdf.set_xy(10, 140)
+    pdf.set_font("Arial", "B", 12)
+    pdf.set_text_color(*GREEN_PRICE)
+    pdf.cell(190, 8, f"TOTAL FARE: ${booking.fare:.2f}", 0, 0, 'C')
+
     pdf_output = pdf.output(dest='S').encode('latin-1')
     response = make_response(pdf_output)
     response.headers.set('Content-Disposition', 'attachment', filename=f'ticket_{pnr}.pdf')
@@ -374,7 +394,6 @@ def download_ticket(pnr):
 def print_ticket(pnr):
     booking = Booking.objects.get_or_404(pnr_number=pnr)
     
-    # Enhanced QR Data for Print View as well
     qr_data = (f"PNR: {booking.pnr_number}\n"
                f"Name: {booking.passenger_name}\n"
                f"Age: {booking.passenger_age}\n"
@@ -418,15 +437,12 @@ def login():
 def admin_dashboard():
     if not session.get('is_admin'): return redirect(url_for('login'))
     
-    # Pagination settings
     page = request.args.get('page', 1, type=int)
     per_page = 10
     
-    # Calculate pagination details
     total_bookings = Booking.objects.count()
     total_pages = math.ceil(total_bookings / per_page)
     
-    # Fetch specific page of bookings (Optimized query)
     paginated_bookings = Booking.objects().order_by('-id').skip((page - 1) * per_page).limit(per_page)
     
     all_trains = Train.objects().order_by('train_name')
@@ -452,14 +468,12 @@ def my_bookings():
         session.clear()
         return redirect(url_for('login'))
         
-    # Pagination Logic
     page = request.args.get('page', 1, type=int)
     per_page = 10
     
     total_bookings = Booking.objects(user=user).count()
     total_pages = math.ceil(total_bookings / per_page)
     
-    # Fetch paginated bookings
     bookings = Booking.objects(user=user).order_by('-id').skip((page - 1) * per_page).limit(per_page)
     
     return render_template('my_bookings.html', 
