@@ -1,37 +1,57 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import User, Booking, Passenger
+import sys
 
 auth_bp = Blueprint('auth', __name__)
 
 @auth_bp.route('/signup', methods=['POST'])
 def signup():
-    username = request.form['username']
-    password = request.form['password']
-    if User.objects(username=username).first():
-        flash('Username already exists.', 'danger')
+    try:
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if not username or not password:
+            flash('Username and password are required.', 'danger')
+            return redirect(url_for('main.index'))
+
+        if User.objects(username=username).first():
+            flash('Username already exists.', 'danger')
+            return redirect(url_for('main.index'))
+        
+        new_user = User(username=username, email=request.form.get('email'), 
+                        phone_number=request.form.get('phone'))
+        new_user.set_password(password)
+        new_user.save()
+        flash('Account created successfully!', 'success')
         return redirect(url_for('main.index'))
-    
-    new_user = User(username=username, email=request.form.get('email'), 
-                    phone_number=request.form.get('phone'))
-    new_user.password_hash = generate_password_hash(password)
-    new_user.save()
-    flash('Account created successfully!', 'success')
-    return redirect(url_for('main.index'))
+    except Exception as e:
+        print(f"Signup Error: {e}", file=sys.stderr)
+        flash('An error occurred during signup.', 'danger')
+        return redirect(url_for('main.index'))
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        user = User.objects(username=request.form['username']).first()
-        if user and check_password_hash(user.password_hash, request.form['password']):
-            session['logged_in'] = True
-            session['user_id'] = str(user.id)
-            session['username'] = user.username
-            session['is_admin'] = (user.role == 'admin')
-            flash(f'Welcome back, {user.username}!', 'success')
-        else:
-            flash('Invalid credentials.', 'danger')
-        return redirect(url_for('main.index'))
+        try:
+            username = request.form.get('username')
+            password = request.form.get('password')
+            
+            user = User.objects(username=username).first()
+            if user and user.check_password(password):
+                session['logged_in'] = True
+                session['user_id'] = str(user.id)
+                session['username'] = user.username
+                session['is_admin'] = (user.role == 'admin')
+                flash(f'Welcome back, {user.username}!', 'success')
+            else:
+                flash('Invalid credentials.', 'danger')
+            return redirect(url_for('main.index'))
+        except Exception as e:
+            print(f"Login Error: {e}", file=sys.stderr)
+            flash('An error occurred during login. Check database connection.', 'danger')
+            return redirect(url_for('main.index'))
+            
     return render_template('login.html')
 
 @auth_bp.route('/logout')
@@ -45,7 +65,11 @@ def profile():
     if not session.get('logged_in'): 
         return redirect(url_for('auth.login'))
     
-    user = User.objects.get(id=session['user_id'])
+    try:
+        user = User.objects.get(id=session['user_id'])
+    except:
+        session.clear()
+        return redirect(url_for('auth.login'))
 
     if request.method == 'POST':
         action = request.args.get('action')
@@ -75,19 +99,21 @@ def profile():
 
 @auth_bp.route('/change_password', methods=['POST'])
 def change_password():
+    if not session.get('logged_in'): return redirect(url_for('auth.login'))
     user = User.objects.get(id=session['user_id'])
-    if not check_password_hash(user.password_hash, request.form['current_password']):
+    if not user.check_password(request.form['current_password']):
         flash('Incorrect current password.', 'danger')
     elif request.form['new_password'] != request.form['confirm_password']:
         flash('Passwords do not match.', 'danger')
     else:
-        user.password_hash = generate_password_hash(request.form['new_password'])
+        user.set_password(request.form['new_password'])
         user.save()
         flash('Password updated.', 'success')
     return redirect(url_for('auth.profile'))
 
 @auth_bp.route('/profile/delete', methods=['POST'])
 def delete_account():
+    if not session.get('logged_in'): return redirect(url_for('auth.login'))
     user = User.objects.get(id=session['user_id'])
     Booking.objects(user=user).delete()
     user.delete()
