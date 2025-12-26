@@ -6,7 +6,7 @@ load_dotenv()
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-key-for-local-use')
     MONGODB_SETTINGS = {
-        'host': os.environ.get('MONGO_URI', 'mongodb://localhost:27017/railway_db')
+        'host': os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/railway_db')
     }
     # Mail Settings
     MAIL_SERVER = 'smtp.gmail.com'
