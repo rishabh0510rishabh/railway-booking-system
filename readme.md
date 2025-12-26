@@ -1,74 +1,35 @@
-### LINK TO THE WEBSITE
-
-### 🚂 Railway Ticket Booking System
-  This is a Python-based web application built with the Flask framework for a railway ticket booking system. It features a robust backend, a flexible database schema, and a modern, responsive user interface.
-
-### ✨ Features
-### User & Admin Management
-User Authentication: Secure user registration, login, and logout. Passwords are hashed using werkzeug.security.
-
-Admin Dashboard: A dedicated panel for administrators to manage all bookings and add new trains to the system.
-
-Personalized Profile: Logged-in users can view and update their profile information. They can also save passenger details for faster bookings.
-
-### Core Booking Functionality
-Train Search: Users can search for trains by source and destination, with optional filters for different times of the day (morning, afternoon, evening).
-
-Dynamic Booking System: The system handles seat allocation based on availability, assigning statuses like Confirmed, RAC (Reservation Against Cancellation), or Waitlisted.
-
-PNR Status Check: Users can check the status of a ticket using a unique PNR number.
-
-### Journey & Travel Planning
-Detailed Train Routes: A dedicated page displays the full route of a train, including all stops and their arrival times.
-
-Return Journey Suggestion: The system can intelligently suggest and direct the user to a return journey train based on their original booking.
-
-### Ticket Generation & Output
-Printable E-Ticket: A clean, printer-friendly HTML version of the ticket is available.
-
-PDF Download: A professional-looking PDF e-ticket with a QR code containing key ticket details can be downloaded.
-
-QR Code Integration: Each ticket includes a unique QR code that, when scanned, provides the PNR, passenger name, and status.
-
-### 🗃️ Database Schema
-The application uses an SQLite database with the following models:
-
-User: Stores user credentials and profile information.
-
-Train: Contains details about each train, including its route, departure, arrival, and total seats.
-
-Route: A child model of Train that stores individual stops along a train's journey.
-
-Booking: Records all ticket bookings, including passenger details, fare, and status.
-
-Passenger: Allows users to save frequently traveling passengers for quick bookings.
-
-### 🚀 Setup & Installation
-Follow these steps to get the project up and running on your local machine.
-
-### 1. Clone the repository
-git clone https://github.com/rishabh0510rishabh/railway-booking-system
-cd ticket-booking-app
-
-### 2. Set up the Python environment
-It is recommended to use a virtual environment.
-
-python -m venv venv
-source venv/bin/activate   # On Windows: venv\Scripts\activate
-
-### 3. Install required libraries
-Install all the necessary dependencies from the requirements.txt file.
-
-pip install -r requirements.txt
-
-### 4. Initialize the database with a large dataset
-The provided init_db.py script is designed to create a large-scale test environment. It will delete any existing railway.db file and populate a new one with ~200 trains and thousands of bookings to simulate real-world scenarios.
-
-python init_db.py
-
-### 5. Run the application
-Start the Flask development server.
-
-python app.py
-
-The application will be available at http://127.0.0.1:5000. You can log in with the default admin account: username admin and password password123, or the test user username testuser and password password.
+🚂 Railway Ticket Booking System (Modular Edition)A high-performance, secure, and modular web application for booking train tickets. Originally a monolith, this project has been re-architected into a scalable Flask Blueprint structure with MongoDB Atlas integration.🚀 Key FeaturesModular Architecture: Refactored into a clean railway_app package with dedicated Blueprints for Auth, Booking, Main, and Admin.MongoDB Atlas Optimized:High-Speed Search: Database-level range filtering and Compound Indexes ensure instant search results.Aggregation Pipeline: Solves the "N+1 Query" problem by calculating seat availability in a single database trip (replacing legacy MapReduce).Security First:CSRF Protection: All forms secured globally with Flask-WTF.Secure Auth: Password hashing with Werkzeug and session management.Environment Config: Credentials managed via .env or Vercel Environment Variables.Advanced Ticketing:Smart Allocation: Auto-assigns Confirmed, RAC, or Waitlist status.PDF Generation: Generates professional tickets with Blue Header styling and dynamic QR Codes.Email Integration: Sends booking confirmations via SMTP.Admin Dashboard: comprehensive panel to manage trains and view bookings with real-time client-side search.🛠️ Tech Stack & ArchitectureBackend: Python 3.11+, Flask (Blueprints, Application Factory)Database: MongoDB (via MongoEngine ODM)Frontend: Jinja2 Templates, Bootstrap 5Utilities: fpdf (PDFs), qrcode (QR Gen), flask-mail (Email)Deployment: Vercel (Serverless Function compatible)Folder Structure/railway-booking-system
+│
+├── app.py              # Application Entry Point (Launcher)
+├── config.py           # Configuration Class
+├── models.py           # Database Schemas & Indexes
+├── vercel.json         # Vercel Deployment Config
+├── requirements.txt    # Dependencies
+│
+└── railway_app/        # Main Package
+    ├── __init__.py     # App Factory & Extensions (CSRF, Mail, DB)
+    ├── utils.py        # Helper Functions (PDF, Email, Logic)
+    │
+    ├── routes/         # Modular Logic
+    │   ├── auth.py     # Login/Signup
+    │   ├── booking.py  # Ticket Booking & PNR
+    │   ├── main.py     # Search & Homepage
+    │   └── admin.py    # Dashboard
+    │
+    ├── templates/      # Jinja2 HTML Files
+    └── static/         # CSS & Assets
+⚙️ Setup & Installation1. PrerequisitesPython 3.10+ installed.MongoDB Atlas Account (or local MongoDB).Gmail Account (for sending ticket emails).2. InstallationClone the repository:git clone [https://github.com/yourusername/railway-booking-system.git](https://github.com/yourusername/railway-booking-system.git)
+cd railway-booking-system
+Create a Virtual Environment:python -m venv venv
+# Windows
+venv\Scripts\activate
+# Mac/Linux
+source venv/bin/activate
+Install Dependencies:pip install -r requirements.txt
+Configure Environment:Create a .env file in the root directory:SECRET_KEY=your_super_secret_key_here
+MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/railway_db
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASS=your_app_password
+3. Initialize DatabaseRun the initialization script to seed the database with sample trains and users:python init_db.py
+4. Run the Applicationpython app.py
+Visit http://127.0.0.1:5000 in your browser.☁️ Deployment (Vercel)This project is configured for seamless deployment on Vercel.Prepare: Ensure vercel.json exists in the root and app.py uses the create_app() pattern.Push to GitHub: Commit all your changes.Import to Vercel: Connect your repository.Environment Variables: In Vercel Project Settings, add:MONGO_URISECRET_KEYEMAIL_USEREMAIL_PASSDeploy: Vercel will auto-detect the Python app and launch it.🛡️ Security NotesCSRF Tokens: Every form submission requires a {{ csrf_token() }}. If you see a "400 Bad Request," check if the form has the hidden token input.Production: Ensure DEBUG is set to False in production environments.🤝 ContributingFork the repo.Create a feature branch (git checkout -b feature/NewFeature).Commit your changes.Push to the branch and open a Pull Request.Disclaimer: This is a portfolio project demonstrating Flask architecture patterns. Do not use real

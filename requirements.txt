@@ -1,8 +1,15 @@
 flask<2.3
 werkzeug<3.0
 flask-mongoengine
+flask-wtf
 fpdf
 qrcode
 Pillow
 gunicorn
 dnspython
+python-dotenv   
+flask-mail
+blinker
+email-validator
+mongoengine
+pymongo
