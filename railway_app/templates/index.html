@@ -1,7 +1,6 @@
 {% extends 'base.html' %}
 
 {% block content %}
-  <!-- New Hero Section -->
   <div class="hero-section">
     <div class="container">
       <h1 class="display-4">Your Journey Starts Here</h1>
@@ -9,10 +8,9 @@
     </div>
   </div>
 
-  <!-- Search Form Card -->
   <div class="card bg-light p-4 mb-5">
     <h2 class="mb-4 text-center">Search for Trains</h2>
-    <form action="/search" method="post">
+    <form action="{{ url_for('main.search') }}" method="post">
       <div class="row">
         <div class="col-md-5 mb-3">
           <label for="source" class="form-label">From:</label>
@@ -23,11 +21,10 @@
           <input type="text" class="form-control" id="destination" name="destination" placeholder="e.g., Lucknow" required>
         </div>
         <div class="col-md-2 d-grid mb-3">
-            <label class="form-label">&nbsp;</label> <!-- Spacer for alignment -->
+            <label class="form-label">&nbsp;</label>
             <button type="submit" class="btn btn-primary">Search</button>
         </div>
       </div>
-      <!-- Time Filter remains the same -->
       <div class="mb-3">
         <label class="form-label d-block">Departure Time:</label>
         <div class="form-check form-check-inline">

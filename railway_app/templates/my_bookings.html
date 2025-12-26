@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block content %}
+  <h1 class="display-6 mb-4">My Bookings</h1>
+  
+  {% if bookings %}
+    <div class="list-group mb-4">
+      {% for booking in bookings %}
+        <a href="{{ url_for('booking.pnr_status', pnr=booking.pnr_number) }}" class="list-group-item list-group-item-action">
+          <div class="d-flex w-100 justify-content-between">
+            <h5 class="mb-1">{{ booking.train.train_name }}</h5>
+            <small>PNR: {{ booking.pnr_number }}</small>
+          </div>
+          <p class="mb-1">{{ booking.passenger_name }} | {{ booking.seat_class }}</p>
+          <small>Status: <span class="badge bg-success">{{ booking.status }}</span></small>
+        </a>
+      {% endfor %}
+    </div>
+
+    {% if total_pages > 1 %}
+    <nav>
+      <ul class="pagination justify-content-center">
+        <li class="page-item {% if page == 1 %}disabled{% endif %}">
+          <a class="page-link" href="{{ url_for('booking.my_bookings', page=page-1) }}">Previous</a>
+        </li>
+        <li class="page-item disabled"><span class="page-link">Page {{ page }} of {{ total_pages }}</span></li>
+        <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+          <a class="page-link" href="{{ url_for('booking.my_bookings', page=page+1) }}">Next</a>
+        </li>
+      </ul>
+    </nav>
+    {% endif %}
+  {% else %}
+    <div class="alert alert-info">No bookings yet.</div>
+  {% endif %}
+{% endblock %}

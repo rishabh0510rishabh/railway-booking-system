@@ -126,7 +126,7 @@
 
         <div class="print-btn-container">
             <button onclick="window.print()" class="btn"><i class="fas fa-print"></i> Print Ticket</button>
-            <a href="{{ url_for('download_ticket', pnr=booking.pnr_number) }}" class="btn" style="background-color: #28a745; margin-left: 10px;"><i class="fas fa-file-pdf"></i> Download PDF</a>
+            <a href="{{ url_for('booking.download_ticket', pnr=booking.pnr_number) }}" class="btn" style="background-color: #28a745; margin-left: 10px;"><i class="fas fa-file-pdf"></i> Download PDF</a>
         </div>
     </div>
 

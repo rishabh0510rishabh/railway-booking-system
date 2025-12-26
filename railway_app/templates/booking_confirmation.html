@@ -9,9 +9,7 @@
   </div>
 
   <div class="card mt-4">
-    <div class="card-header">
-      Booking Details
-    </div>
+    <div class="card-header">Booking Details</div>
     <div class="card-body">
       <p><strong>Passenger:</strong> {{ booking.passenger_name }} ({{ booking.passenger_age }} years)</p>
       <p><strong>Train:</strong> {{ booking.train.train_name }}</p>
@@ -24,6 +22,6 @@
     </div>
   </div>
 
-  <a href="{{ url_for('book_return', pnr=booking.pnr_number) }}" class="btn btn-primary mt-3">Book Return Journey</a>
-  <a href="/" class="btn btn-secondary mt-3">Book Another Ticket</a>
+  <a href="{{ url_for('booking.book_return', pnr=booking.pnr_number) }}" class="btn btn-primary mt-3">Book Return Journey</a>
+  <a href="{{ url_for('main.index') }}" class="btn btn-secondary mt-3">Book Another Ticket</a>
 {% endblock %}

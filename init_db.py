@@ -2,10 +2,10 @@ import random
 import string
 import math
 from datetime import datetime, timedelta
-# Import necessary functions and models from your app
-from app import app, db, Train, User, Booking, Route, Passenger, generate_pnr, calculate_fare, generate_seat_number, SEATS_PER_COACH
-
-# --- Configuration ---
+from railway_app import create_app
+from models import db, Train, User, Booking, Passenger, Route
+from railway_app.utils import generate_pnr, calculate_fare, generate_seat_number, SEATS_PER_COACH
+app = create_app()
 cities = ['New Delhi', 'Mumbai', 'Kolkata', 'Chennai', 'Bangalore', 'Hyderabad', 'Pune', 'Ahmedabad', 'Lucknow', 'Jaipur', 'Patna', 'Bhopal', 'Chandigarh']
 prefixes = ['Express', 'Mail', 'Shatabdi', 'Rajdhani', 'Duronto', 'Superfast', 'Intercity']
 

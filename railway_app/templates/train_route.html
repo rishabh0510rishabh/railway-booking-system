@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="display-6 mb-4">Route for {{ train.train_name }}</h1>
+<div class="card mt-4">
+  <div class="card-header">Travel Details</div>
+  <ul class="list-group list-group-flush">
+    <li class="list-group-item"><strong>Source:</strong> {{ train.source }} (Dep: {{ train.departure_time }})</li>
+    {% for stop in train.route_stops %}
+    <li class="list-group-item"><strong>Stop {{ loop.index }}:</strong> {{ stop.stop_name }} (Arr: {{ stop.arrival_time }})</li>
+    {% endfor %}
+    <li class="list-group-item"><strong>Destination:</strong> {{ train.destination }} (Arr: {{ train.arrival_time }})</li>
+  </ul>
+</div>
+<a href="{{ url_for('main.index') }}" class="btn btn-secondary mt-3">Back to Search</a>
+{% endblock %}

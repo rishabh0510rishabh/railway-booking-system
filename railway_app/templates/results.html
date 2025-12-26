@@ -20,7 +20,7 @@
             <td>
               {{ train.train_name }}
               <br>
-              <a href="{{ url_for('train_route', train_id=train.id) }}" class="btn btn-link btn-sm p-0">View Route</a>
+              <a href="{{ url_for('main.train_route', train_id=train.id) }}" class="btn btn-link btn-sm p-0">View Route</a>
             </td>
             <td>{{ train.departure_time }}</td>
             <td>{{ train.travel_time }}</td>
@@ -34,7 +34,7 @@
               {% endif %}
             </td>
             <td>
-              <a href="{{ url_for('book', train_id=train.id) }}" class="btn btn-sm btn-primary">Book Now</a>
+              <a href="{{ url_for('booking.book', train_id=train.id) }}" class="btn btn-sm btn-primary">Book Now</a>
             </td>
           </tr>
         {% endfor %}
@@ -46,5 +46,5 @@
     </div>
   {% endif %}
 
-  <a href="/" class="btn btn-secondary mt-3">Search Again</a>
+  <a href="{{ url_for('main.index') }}" class="btn btn-secondary mt-3">Search Again</a>
 {% endblock %}

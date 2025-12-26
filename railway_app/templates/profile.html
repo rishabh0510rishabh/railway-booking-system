@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+  <div class="col-md-7 mb-4">
+    <div class="card shadow-sm">
+      <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <h4 class="mb-0">User Profile</h4>
+        <div>
+          <button id="edit-profile-btn" class="btn btn-sm btn-warning me-2 mb-1">Edit Profile</button>
+          <button type="button" class="btn btn-sm btn-danger me-2 mb-1" data-bs-toggle="modal" data-bs-target="#deleteAccountModal">Delete Account</button>
+          <button type="button" class="btn btn-sm btn-info me-2 mb-1" data-bs-toggle="modal" data-bs-target="#changePasswordModal">Change Password</button>
+          <a href="{{ url_for('booking.my_bookings') }}" class="btn btn-sm btn-primary mb-1">View My Bookings</a>
+        </div>
+      </div>
+      <div class="card-body text-center">
+        <div class="mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" fill="currentColor" class="bi bi-person-circle text-secondary" viewBox="0 0 16 16">
+            <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/><path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1"/>
+          </svg>
+        </div>
+        
+        <form id="profile-form" action="{{ url_for('auth.profile') }}" method="post" class="text-start">
+          <div class="mb-3"><label class="form-label">Username</label><input type="text" class="form-control" id="username" name="username" value="{{ user.username }}" disabled></div>
+          <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" id="email" name="email" value="{{ user.email or '' }}" disabled></div>
+          <div class="mb-3"><label class="form-label">Phone</label><input type="tel" class="form-control" id="phone" name="phone" value="{{ user.phone_number or '' }}" disabled></div>
+          <button type="submit" id="save-changes-btn" class="btn btn-success" disabled>Save Changes</button>
+        </form>
+      </div>
+    </div>
+    
+    <div class="card shadow-sm mt-4">
+      <div class="card-header bg-dark text-white"><h5 class="mb-0">Saved Passengers</h5></div>
+      <div class="card-body">
+        <form action="{{ url_for('auth.profile', action='add_passenger') }}" method="post">
+          <div class="input-group mb-3">
+            <input type="text" class="form-control" name="passenger_name" placeholder="Passenger Name" required>
+            <input type="number" class="form-control" name="passenger_age" placeholder="Age" min="1" required>
+            <select class="form-select" name="berth_preference">
+              <option value="">Berth (Optional)</option>
+              <option>Lower</option><option>Middle</option><option>Upper</option><option>Side Lower</option><option>Side Upper</option>
+            </select>
+            <button class="btn btn-primary" type="submit">Add</button>
+          </div>
+        </form>
+        {% if user.saved_passengers %}
+          <ul class="list-group list-group-flush">
+            {% for passenger in user.saved_passengers %}
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span>{{ passenger.name }} ({{ passenger.age }} years old)</span>
+                <a href="{{ url_for('auth.profile', action='delete_passenger', passenger_id=passenger.uid) }}" class="btn btn-sm btn-outline-danger">Remove</a>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-5 mb-4">
+    <div class="card shadow-sm">
+      <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Recent Bookings</h5>
+        <a href="{{ url_for('booking.my_bookings') }}" class="btn btn-sm btn-light">View All</a>
+      </div>
+      <div class="card-body">
+        {% if recent_bookings %}
+          <div class="list-group">
+            {% for booking in recent_bookings %}
+              <a href="{{ url_for('booking.pnr_status', pnr=booking.pnr_number) }}" class="list-group-item list-group-item-action">
+                <div class="d-flex w-100 justify-content-between">
+                  <h6 class="mb-1">{{ booking.train.train_name }}</h6>
+                  <small>PNR: {{ booking.pnr_number }}</small>
+                </div>
+                <small>Status: <span class="badge bg-primary">{{ booking.status }}</span></small>
+              </a>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="changePasswordModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="{{ url_for('auth.change_password') }}" method="post">
+        <div class="modal-body">
+          <input type="password" name="current_password" class="form-control mb-2" placeholder="Current Password" required>
+          <input type="password" name="new_password" class="form-control mb-2" placeholder="New Password" required>
+          <input type="password" name="confirm_password" class="form-control mb-2" placeholder="Confirm Password" required>
+        </div>
+        <div class="modal-footer"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="deleteAccountModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-body"><p>Delete your account permanently?</p></div>
+      <div class="modal-footer">
+        <form action="{{ url_for('auth.delete_account') }}" method="post"><button type="submit" class="btn btn-danger">Confirm Delete</button></form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

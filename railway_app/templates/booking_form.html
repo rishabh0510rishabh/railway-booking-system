@@ -5,7 +5,7 @@
   <h1 class="display-6 mb-3">Book Ticket</h1>
   <h5 class="mb-4 text-muted">Train: {{ train.train_name }} ({{ train.source }} to {{ train.destination }})</h5>
   
-  <form id="bookingForm" action="{{ url_for('submit_booking') }}" method="post">
+  <form id="bookingForm" action="{{ url_for('booking.submit_booking') }}" method="post">
     <input type="hidden" name="train_id" value="{{ train.id }}">
     
     {% if saved_passengers %}
@@ -14,7 +14,7 @@
       <select class="form-select" id="saved_passenger">
         <option value="">-- Select a passenger --</option>
         {% for passenger in saved_passengers %}
-          <option value="{{ passenger.name }},{{ passenger.age }},{{ passenger.berth_preference or '' }}">{{ passenger.name }} ({{ passenger.age }} years old){% if passenger.berth_preference %} - {{ passenger.berth_preference }}{% endif %}</option>
+          <option value="{{ passenger.name }},{{ passenger.age }},{{ passenger.berth_preference or '' }}">{{ passenger.name }} ({{ passenger.age }} years old)</option>
         {% endfor %}
       </select>
     </div>
@@ -22,7 +22,7 @@
 
     <div class="mb-3">
         <label for="email_address" class="form-label">Email for Ticket:</label>
-        <input type="email" class="form-control" id="email_address" name="email_address" placeholder="name@example.com" required>
+        <input type="email" class="form-control" id="email_address" name="email_address" required>
         <div class="form-text">We will send the ticket confirmation here.</div>
     </div>
 
@@ -60,21 +60,19 @@
 
     <div class="form-check mb-3">
       <input class="form-check-input" type="checkbox" name="save_passenger" id="save_passenger">
-      <label class="form-check-label" for="save_passenger">
-        Save these passenger details for future use
-      </label>
+      <label class="form-check-label" for="save_passenger">Save details for future use</label>
     </div>
     
     <button type="submit" class="btn btn-primary">Confirm Booking</button>
   </form>
 </div>
 
-<div class="modal fade" id="fareModal" tabindex="-1" aria-labelledby="fareModalLabel" aria-hidden="true">
+<div class="modal fade" id="fareModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="fareModalLabel">Confirm and Pay</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <h5 class="modal-title">Confirm and Pay</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
         <p><strong>Passenger:</strong> <span id="modal-passenger-name"></span></p>
@@ -82,9 +80,6 @@
         <p><strong>Seat Class:</strong> <span id="modal-seat-class"></span></p>
         <hr>
         <h4>Total Fare: <span id="modal-fare" class="text-success fw-bold"></span></h4>
-        <div class="alert alert-info mt-3" role="alert">
-          <small>Note: Final status (Confirmed, RAC, WL) will be determined upon booking based on seat availability.</small>
-        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -102,7 +97,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const seatClassInput = document.getElementById('seat_class');
     const berthPreferenceInput = document.getElementById('berth_preference');
     
-    // Payment Modal Elements
     const bookingForm = document.getElementById('bookingForm');
     const fareModal = new bootstrap.Modal(document.getElementById('fareModal'));
     const modalPassengerName = document.getElementById('modal-passenger-name');
@@ -112,12 +106,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const payNowBtn = document.getElementById('payNowBtn');
 
     const BASE_FARE = 1000;
-    const FARE_MULTIPLIERS = {
-        'Sleeper': 1.0,
-        'AC 3 Tier': 1.5,
-        'AC 2 Tier': 2.0,
-        'AC 1st Class': 3.0
-    };
+    const FARE_MULTIPLIERS = { 'Sleeper': 1.0, 'AC 3 Tier': 1.5, 'AC 2 Tier': 2.0, 'AC 1st Class': 3.0 };
 
     if (savedPassengerDropdown) {
         savedPassengerDropdown.addEventListener('change', function() {
@@ -127,26 +116,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 passengerNameInput.value = name;
                 passengerAgeInput.value = age;
                 berthPreferenceInput.value = berth;
-            } else {
-                passengerNameInput.value = '';
-                passengerAgeInput.value = '';
-                berthPreferenceInput.value = '';
             }
         });
     }
 
     bookingForm.addEventListener('submit', function(event) {
         event.preventDefault(); 
-        const name = passengerNameInput.value;
-        const age = passengerAgeInput.value;
         const seatClass = seatClassInput.value;
         const fare = (BASE_FARE * FARE_MULTIPLIERS[seatClass]).toFixed(2);
-
-        modalPassengerName.textContent = name;
-        modalPassengerAge.textContent = age;
+        modalPassengerName.textContent = passengerNameInput.value;
+        modalPassengerAge.textContent = passengerAgeInput.value;
         modalSeatClass.textContent = seatClass;
         modalFare.textContent = `₹${fare}`;
-
         fareModal.show();
     });
 
