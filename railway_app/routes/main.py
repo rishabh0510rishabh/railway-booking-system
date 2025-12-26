@@ -10,28 +10,39 @@ def index():
 
 @main_bp.route('/search', methods=['POST'])
 def search():
-    source = request.form['source']
-    destination = request.form['destination']
-    time_filter = request.form['time_filter']
+    source = request.form.get('source', '').strip()
+    destination = request.form.get('destination', '').strip()
+    time_filter = request.form.get('time_filter', 'all')
+    query = {
+        'source__iexact': source,
+        'destination__iexact': destination
+    }
 
-    trains = Train.objects(source__iexact=source, destination__iexact=destination)
+    if time_filter == 'morning':
+        query['departure_time__gte'] = '05:00'
+        query['departure_time__lt'] = '12:00'
+    elif time_filter == 'afternoon':
+        query['departure_time__gte'] = '12:00'
+        query['departure_time__lt'] = '17:00'
+    elif time_filter == 'evening':
+        query['departure_time__gte'] = '17:00'
+        query['departure_time__lt'] = '24:00'
+
+    trains = list(Train.objects(**query))
     
-    filtered_trains = []
+    if not trains:
+        return render_template('results.html', trains=[], source=source, destination=destination)
+
+    train_ids = [t.pk for t in trains]
+    
+    confirmed_counts = Booking.objects(train__in=train_ids, status='Confirmed').item_frequencies('train')
+
     for train in trains:
-        t_time = train.departure_time
-        include = False
-        if time_filter == 'all': include = True
-        elif time_filter == 'morning' and '05:00' <= t_time < '12:00': include = True
-        elif time_filter == 'afternoon' and '12:00' <= t_time < '17:00': include = True
-        elif time_filter == 'evening' and '17:00' <= t_time < '24:00': include = True
-        
-        if include:
-            confirmed_bookings = Booking.objects(train=train, status='Confirmed').count()
-            train.available_seats = train.total_seats - confirmed_bookings
-            train.travel_time = calculate_travel_time(train.departure_time, train.arrival_time)
-            filtered_trains.append(train)
+        count = confirmed_counts.get(train.pk, 0)
+        train.available_seats = train.total_seats - count
+        train.travel_time = calculate_travel_time(train.departure_time, train.arrival_time)
             
-    return render_template('results.html', trains=filtered_trains, source=source, destination=destination)
+    return render_template('results.html', trains=trains, source=source, destination=destination)
 
 @main_bp.route('/train_route/<train_id>')
 def train_route(train_id):

@@ -19,6 +19,13 @@ class Train(db.Document):
     total_seats = db.IntField(required=True)
     route_stops = db.ListField(db.EmbeddedDocumentField(Route))
 
+    meta = {
+        'indexes': [
+            ('source', 'destination', 'departure_time'),
+            'train_name'
+        ]
+    } 
+
     @property
     def id(self):
         return str(self.pk)
