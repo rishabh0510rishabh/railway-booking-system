@@ -6,13 +6,16 @@ main_bp = Blueprint('main', __name__)
 
 @main_bp.route('/')
 def index():
+    """Renders the homepage."""
     return render_template('index.html')
 
 @main_bp.route('/search', methods=['POST'])
 def search():
+    """Optimized search using Database-level filtering and Aggregation for seat counts."""
     source = request.form.get('source', '').strip()
     destination = request.form.get('destination', '').strip()
     time_filter = request.form.get('time_filter', 'all')
+
     query = {
         'source__iexact': source,
         'destination__iexact': destination
@@ -35,7 +38,12 @@ def search():
 
     train_ids = [t.pk for t in trains]
     
-    confirmed_counts = Booking.objects(train__in=train_ids, status='Confirmed').item_frequencies('train')
+    pipeline = [
+        {"$match": {"train": {"$in": train_ids}, "status": "Confirmed"}},
+        {"$group": {"_id": "$train", "count": {"$sum": 1}}}
+    ]
+    agg_results = list(Booking.objects.aggregate(*pipeline))
+    confirmed_counts = {res['_id']: res['count'] for res in agg_results}
 
     for train in trains:
         count = confirmed_counts.get(train.pk, 0)
@@ -46,13 +54,16 @@ def search():
 
 @main_bp.route('/train_route/<train_id>')
 def train_route(train_id):
+    """Displays the specific route stops for a train."""
     train = Train.objects.get_or_404(id=train_id)
     return render_template('train_route.html', train=train)
 
 @main_bp.route('/train_route_check')
 def train_route_check():
+    """Handles the route search from the navbar modal."""
     query = request.args.get('train_query')
-    if not query: return redirect(url_for('main.index'))
+    if not query: 
+        return redirect(url_for('main.index'))
     train = Train.objects(train_name__iexact=query).first() or \
             Train.objects(train_name__icontains=query).first()
     
