@@ -11,6 +11,7 @@
   <div class="card bg-light p-4 mb-5">
     <h2 class="mb-4 text-center">Search for Trains</h2>
     <form action="{{ url_for('main.search') }}" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="row">
         <div class="col-md-5 mb-3">
           <label for="source" class="form-label">From:</label>

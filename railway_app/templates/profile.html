@@ -21,6 +21,7 @@
         </div>
         
         <form id="profile-form" action="{{ url_for('auth.profile') }}" method="post" class="text-start">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="mb-3"><label class="form-label">Username</label><input type="text" class="form-control" id="username" name="username" value="{{ user.username }}" disabled></div>
           <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" id="email" name="email" value="{{ user.email or '' }}" disabled></div>
           <div class="mb-3"><label class="form-label">Phone</label><input type="tel" class="form-control" id="phone" name="phone" value="{{ user.phone_number or '' }}" disabled></div>
@@ -33,6 +34,7 @@
       <div class="card-header bg-dark text-white"><h5 class="mb-0">Saved Passengers</h5></div>
       <div class="card-body">
         <form action="{{ url_for('auth.profile', action='add_passenger') }}" method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="input-group mb-3">
             <input type="text" class="form-control" name="passenger_name" placeholder="Passenger Name" required>
             <input type="number" class="form-control" name="passenger_age" placeholder="Age" min="1" required>
@@ -86,6 +88,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <form action="{{ url_for('auth.change_password') }}" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-body">
           <input type="password" name="current_password" class="form-control mb-2" placeholder="Current Password" required>
           <input type="password" name="new_password" class="form-control mb-2" placeholder="New Password" required>
@@ -102,7 +105,10 @@
     <div class="modal-content">
       <div class="modal-body"><p>Delete your account permanently?</p></div>
       <div class="modal-footer">
-        <form action="{{ url_for('auth.delete_account') }}" method="post"><button type="submit" class="btn btn-danger">Confirm Delete</button></form>
+        <form action="{{ url_for('auth.delete_account') }}" method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-danger">Confirm Delete</button>
+        </form>
       </div>
     </div>
   </div>

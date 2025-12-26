@@ -2,8 +2,10 @@ from flask import Flask
 from flask_mail import Mail
 from models import db
 from config import Config
+from flask_wtf.csrf import CSRFProtect
 
 mail = Mail()
+csrf = CSRFProtect()
 
 def create_app():
     app = Flask(__name__)
@@ -12,6 +14,7 @@ def create_app():
     # Initialize Extensions
     db.init_app(app)
     mail.init_app(app)
+    csrf.init_app(app)
 
     # Register Blueprints
     from .routes.main import main_bp

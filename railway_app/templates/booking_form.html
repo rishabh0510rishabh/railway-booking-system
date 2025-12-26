@@ -6,6 +6,7 @@
   <h5 class="mb-4 text-muted">Train: {{ train.train_name }} ({{ train.source }} to {{ train.destination }})</h5>
   
   <form id="bookingForm" action="{{ url_for('booking.submit_booking') }}" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="train_id" value="{{ train.id }}">
     
     {% if saved_passengers %}
